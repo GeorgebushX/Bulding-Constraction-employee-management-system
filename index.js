@@ -38,15 +38,15 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Routes
-app.use('/building/construction/', authRouter);
+app.use('/api', authRouter);
 
 app.use("/college/student", studentRouter);
 app.use("/college/department", departmentRouter)
 app.use("/college/staff", staffRouter)
 
-app.use("/building/construction/",supervisorRouter)
-app.use("/building/construction/",contractorRouter)
-app.use("/building/construction/",workersRouter)
+app.use("/api",supervisorRouter)
+app.use("/api",contractorRouter)
+app.use("/api",workersRouter)
 
 
 // start the server
