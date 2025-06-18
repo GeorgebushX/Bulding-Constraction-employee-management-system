@@ -45,6 +45,11 @@ const workerSchema = new mongoose.Schema({
     enum: ["Pitter", "Helper", "Guest worker"], 
     required: true 
   },
+  contractorType: {
+    type: String,
+    enum: ['masonworker', 'centringsworker', 'steelworker'],
+    required: true
+  },
   joiningDate: { 
     type: String,
     set: function(date) {

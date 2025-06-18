@@ -33,16 +33,16 @@ export const addWorker = async (req, res) => {
     const {
       name, email, dateOfBirth, gender, phone, maritalStatus,
       nationality, bloodGroup, alternatePhone, address,
-      permanentAddress, role, joiningDate, bankAccount,
+      permanentAddress, role,contractorType, joiningDate, bankAccount,
       bankCode, password
     } = req.body;
 
     // Validate required fields
     if (!name || !email || !dateOfBirth || !gender || !phone || 
-        !role || !joiningDate || !password) {
+        !role || !contractorType || !joiningDate || !password) {
       return res.status(400).json({ 
         success: false, 
-        message: "Required fields: name, email, dateOfBirth, gender, phone, role, joiningDate, password" 
+        message: "Required fields: name, email, dateOfBirth, gender, phone, role,contractorType, joiningDate, password" 
       });
     }
 
@@ -99,6 +99,7 @@ export const addWorker = async (req, res) => {
       address: parsedAddress,
       permanentAddress: parsedPermanentAddress,
       role,
+      contractorType,
       joiningDate,
       bankAccount,
       bankCode,
@@ -195,7 +196,7 @@ export const updateWorker = async (req, res) => {
     // Update basic fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'maritalStatus',
-      'nationality', 'bloodGroup', 'alternatePhone', 'role', 'joiningDate',
+      'nationality', 'bloodGroup', 'alternatePhone', 'role','contractorType' ,'joiningDate',
       'bankAccount', 'bankCode'
     ];
     
