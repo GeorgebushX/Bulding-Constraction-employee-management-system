@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
-
 // import routes
 import authRouter from './Routers/auth.js';
 
