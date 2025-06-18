@@ -47,6 +47,11 @@ const contractorSchema = new mongoose.Schema({
       return formatDate(date);
     }
   },
+  contractorType: {
+    type: String,
+    enum: ['masonHeader', 'centringsHeader', 'steelHeader'],
+    required: true
+  },
   bankAccount: { type: String, trim: true },
   bankCode: { type: String, trim: true },
   contractorIdProof: [{ type: String }],
