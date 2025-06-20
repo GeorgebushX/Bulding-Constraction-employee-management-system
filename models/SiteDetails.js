@@ -36,7 +36,9 @@ const siteSchema = new mongoose.Schema({
       return `${this._id}`;
     }
   },
-  client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  // ✅ FIX: Use Number instead of ObjectId since Client _id is a number
+  client: { type: Number, ref: 'Client', required: true },
+
   siteName: { type: String, required: true },
   location: { type: String, required: true },
   areaSqFt: { type: Number },
@@ -56,7 +58,7 @@ const siteSchema = new mongoose.Schema({
   },
   budget: { type: Number },
   notes: { type: String },
-  siteMap: { type: String }, // Store image as a URL or base64 string
+  siteMap: { type: String },
   createdAt: {
     type: String,
     default: () => formatDate(new Date())
