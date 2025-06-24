@@ -37,10 +37,10 @@ const siteSchema = new mongoose.Schema({
     }
   },
   // ✅ FIX: Use Number instead of ObjectId since Client _id is a number
-  client: { type: Number, ref: 'Client', required: true },
+  client: { type: Number, ref: 'Client'},
 
-  siteName: { type: String, required: true },
-  location: { type: String, required: true },
+  siteName: { type: String },
+  location: { type: String },
   areaSqFt: { type: Number },
   workersCount: workersCountSchema,
   startDate: {

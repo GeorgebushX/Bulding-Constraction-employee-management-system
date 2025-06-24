@@ -29,7 +29,7 @@ const clientSchema = new mongoose.Schema({
       return `${this._id}`;
     }
   },
-  name: { type: String, required: true },
+  name: { type: String },
   contactPerson: { type: String },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   email: { type: String },
