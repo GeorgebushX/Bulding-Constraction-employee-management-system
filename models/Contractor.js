@@ -40,7 +40,7 @@ const contractorSchema = new mongoose.Schema({
   alternatePhone: { type: String },
   address: addressSchema,
   permanentAddress: addressSchema,
-  role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
+  role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"] },
   joiningDate: { 
     type: String,
     set: function(date) {
@@ -49,7 +49,7 @@ const contractorSchema = new mongoose.Schema({
   },
   contractorType: {
     type: String,
-    enum: ['masonHeader', 'centringsHeader', 'steelHeader'],
+    enum: ['MasonHeader', 'CentringsHeader', 'SteelHeader'],
     required: true
   },
   bankAccount: { type: String, trim: true },

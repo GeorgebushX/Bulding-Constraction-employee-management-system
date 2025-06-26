@@ -42,7 +42,7 @@ if (!name || !email || !dateOfBirth || !gender || !phone ||
   !role || !contractorType || !joiningDate || !password) {
 return res.status(400).json({ 
   success: false, 
-  message: "Required fields: name, email, dateOfBirth, gender, phone, role, joiningDate, password" 
+  message: "Required fields: name, email, dateOfBirth, gender, phone, role, joiningDate, password ,contractorType" 
 });
 }
 
