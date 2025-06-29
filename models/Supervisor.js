@@ -58,14 +58,7 @@ const addressSchema = new mongoose.Schema({
 const supervisorSchema = new mongoose.Schema({
   _id: Number, // Auto-incrementing ID
   userId: { type: Number, ref: "User", required: true },
-  supervisorId: { 
-    type: String, 
-    unique: true,
-    sparse: true,
-    default: function() {
-      return `SUP-${this._id}`;
-    }
-  },
+ 
   name: { type: String, required: true },
   dateOfBirth: { 
     type: String,
@@ -75,9 +68,6 @@ const supervisorSchema = new mongoose.Schema({
   },
   password: { type: String },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
-  maritalStatus: { type: String, enum: ["Single", "Married"] },
-  nationality: { type: String },
-  bloodGroup: { type: String },
   email: { type: String, unique: true, lowercase: true },
   phone: { type: String },
   alternatePhone: { type: String },
