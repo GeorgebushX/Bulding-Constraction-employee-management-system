@@ -85,6 +85,7 @@
 // const Worker = mongoose.model('Worker', workerSchema);
 
 // export default Worker;
+
 import mongoose from 'mongoose';
 import mongooseSequence from 'mongoose-sequence';
 
