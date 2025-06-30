@@ -33,7 +33,7 @@
 //   try {
 //     const {
 //       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-//       permanentAddress, role, contractorType, joiningDate, bankAccount,
+//       permanentAddress, role, supervisorType, joiningDate, bankAccount,
 //       bankCode, password
 //     } = req.body;
 
@@ -96,7 +96,7 @@
 //       address: parsedAddress,
 //       permanentAddress: parsedPermanentAddress,
 //       role,
-//       contractorType,
+//       supervisorType,
 //       joiningDate,
 //       bankAccount,
 //       bankCode,
@@ -216,7 +216,7 @@
 //     // Update basic fields
 //     const fieldsToUpdate = [
 //       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 
-//       'role','contractorType','joiningDate', 'bankAccount', 'bankCode'
+//       'role','supervisorType','joiningDate', 'bankAccount', 'bankCode'
 //     ];
     
 //     fieldsToUpdate.forEach(field => {
@@ -436,7 +436,7 @@ export const addSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      permanentAddress, role, contractorType, joiningDate, bankAccount,
+      permanentAddress, role, supervisorType, joiningDate, bankAccount,
       bankCode, password
     } = req.body;
 
@@ -503,7 +503,7 @@ export const addSupervisor = async (req, res) => {
       address: parsedAddress,
       permanentAddress: parsedPermanentAddress,
       role,
-      contractorType,
+      supervisorType,
       joiningDate,
       bankAccount,
       bankCode,
@@ -637,7 +637,7 @@ export const updateSupervisor = async (req, res) => {
     // Update basic fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 
-      'role', 'contractorType', 'joiningDate', 'bankAccount', 'bankCode'
+      'role', 'supervisorType', 'joiningDate', 'bankAccount', 'bankCode'
     ];
     
     fieldsToUpdate.forEach(field => {

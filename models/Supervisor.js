@@ -32,7 +32,7 @@ const supervisorSchema = new mongoose.Schema({
   address: addressSchema,
   permanentAddress: addressSchema,
   role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"]},
-  contractorType: {
+  supervisorType: {
     type: String,
     enum: ['MasonHeader', 'CentringsHeader', 'SteelHeader', 'Electrician', 'Plumber', 'Carpenter']
   },
