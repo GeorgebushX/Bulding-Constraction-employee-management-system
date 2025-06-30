@@ -100,7 +100,7 @@ workerSchema.virtual('visibleRoles').get(function() {
   
   return roles;
 });
-
+  
 // Middleware to validate role consistency
 workerSchema.pre('save', function(next) {
   if (this.contractorRole === 'Mason' && this.centringRole) {

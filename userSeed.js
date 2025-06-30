@@ -105,7 +105,7 @@ const createAdminUser = async () => {
       email: "admin@gmail.com",
       password: hashPassword,
       role: "Engineer",
-      profileImage: defaultImagePath,
+      photo: defaultImagePath,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
