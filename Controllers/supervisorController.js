@@ -1,5 +1,4 @@
 
-
 // import Supervisor from "../models/Supervisor.js";
 // import User from "../models/User.js";
 // import bcrypt from "bcrypt";
@@ -34,7 +33,7 @@
 //   try {
 //     const {
 //       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-//       permanentAddress, role, joiningDate, bankAccount,
+//       permanentAddress, role, contractorType, joiningDate, bankAccount,
 //       bankCode, password
 //     } = req.body;
 
@@ -88,20 +87,21 @@
 //     const newSupervisor = new Supervisor({
 //       userId: newUser._id,
 //       name,
-//       email,
 //       dateOfBirth,
+//       password: hashedPassword,
 //       gender,
+//       email,
 //       phone,
 //       alternatePhone,
 //       address: parsedAddress,
 //       permanentAddress: parsedPermanentAddress,
 //       role,
+//       contractorType,
 //       joiningDate,
 //       bankAccount,
 //       bankCode,
 //       supervisorIdProof,
-//       photo,
-//       password: hashedPassword
+//       photo
 //     });
 
 //     await newSupervisor.save();
@@ -144,15 +144,25 @@
 // export const getSupervisorById = async (req, res) => {
 //   const { id } = req.params;
 //   try {
-//     let supervisor = await Supervisor.findById(id)
-//       .populate("userId", "-password")
-//       .lean();
+//     let supervisor;
 
-//     // If supervisor by `_id` is not found, check by `userId`
-//     if (!supervisor) {
-//       supervisor = await Supervisor.findOne({ userId: id })
+//     // Check if ID is a number (auto-increment ID)
+//     if (!isNaN(id)) {
+//       supervisor = await Supervisor.findOne({ _id: parseInt(id) })
 //         .populate("userId", "-password")
 //         .lean();
+//     } else {
+//       // Try as mongoose ObjectId first
+//       supervisor = await Supervisor.findById(id)
+//         .populate("userId", "-password")
+//         .lean();
+
+//       // If not found, try as userId
+//       if (!supervisor) {
+//         supervisor = await Supervisor.findOne({ userId: id })
+//           .populate("userId", "-password")
+//           .lean();
+//       }
 //     }
 
 //     if (!supervisor) {
@@ -181,7 +191,21 @@
 //     const { id } = req.params;
 //     const updateData = req.body;
 
-//     const supervisor = await Supervisor.findById(id);
+//     let supervisor;
+    
+//     // Check if ID is a number (auto-increment ID)
+//     if (!isNaN(id)) {
+//       supervisor = await Supervisor.findOne({ _id: parseInt(id) });
+//     } else {
+//       // Try as mongoose ObjectId first
+//       supervisor = await Supervisor.findById(id);
+      
+//       // If not found, try as userId
+//       if (!supervisor) {
+//         supervisor = await Supervisor.findOne({ userId: id });
+//       }
+//     }
+
 //     if (!supervisor) {
 //       return res.status(404).json({ 
 //         success: false, 
@@ -191,8 +215,8 @@
 
 //     // Update basic fields
 //     const fieldsToUpdate = [
-//       'name', 'email', 'dateOfBirth', 'gender', 'phone','alternatePhone', 'role', 'joiningDate',
-//       'bankAccount', 'bankCode'
+//       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 
+//       'role','contractorType','joiningDate', 'bankAccount', 'bankCode'
 //     ];
     
 //     fieldsToUpdate.forEach(field => {
@@ -200,6 +224,17 @@
 //         supervisor[field] = updateData[field];
 //       }
 //     });
+
+//     // Update password if provided
+//     if (updateData.password) {
+//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
+//       supervisor.password = hashedPassword;
+      
+//       // Also update user password
+//       await User.findByIdAndUpdate(supervisor.userId, {
+//         password: hashedPassword
+//       });
+//     }
 
 //     // Update address objects
 //     if (updateData.address) {
@@ -232,6 +267,7 @@
 //       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
 //     }
 
+//     supervisor.updatedAt = new Date().toISOString();
 //     await supervisor.save();
     
 //     // Also update the associated User record
@@ -263,8 +299,21 @@
 //   try {
 //     const { id } = req.params;
     
-//     // Find supervisor and delete
-//     const supervisor = await Supervisor.findByIdAndDelete(id);
+//     let supervisor;
+    
+//     // Check if ID is a number (auto-increment ID)
+//     if (!isNaN(id)) {
+//       supervisor = await Supervisor.findOneAndDelete({ _id: parseInt(id) });
+//     } else {
+//       // Try as mongoose ObjectId first
+//       supervisor = await Supervisor.findByIdAndDelete(id);
+      
+//       // If not found, try as userId
+//       if (!supervisor) {
+//         supervisor = await Supervisor.findOneAndDelete({ userId: id });
+//       }
+//     }
+
 //     if (!supervisor) {
 //       return res.status(404).json({ 
 //         success: false, 
@@ -293,7 +342,21 @@
 //   try {
 //     const { id, proofUrl } = req.params;
 
-//     const supervisor = await Supervisor.findById(id);
+//     let supervisor;
+    
+//     // Check if ID is a number (auto-increment ID)
+//     if (!isNaN(id)) {
+//       supervisor = await Supervisor.findOne({ _id: parseInt(id) });
+//     } else {
+//       // Try as mongoose ObjectId first
+//       supervisor = await Supervisor.findById(id);
+      
+//       // If not found, try as userId
+//       if (!supervisor) {
+//         supervisor = await Supervisor.findOne({ userId: id });
+//       }
+//     }
+
 //     if (!supervisor) {
 //       return res.status(404).json({ 
 //         success: false, 
@@ -323,8 +386,6 @@
 // };
 
 
-
-
 import Supervisor from "../models/Supervisor.js";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
@@ -349,9 +410,25 @@ const storage = multer.diskStorage({
 });
 
 // Configure multer for file uploads
-export const upload = multer({ storage }).fields([
+export const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit per file
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|pdf/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images (JPEG, JPG, PNG) and PDF files are allowed'));
+    }
+  }
+}).fields([
   { name: "photo", maxCount: 1 },
-  { name: "supervisorIdProof", maxCount: 5 }, // Allow multiple ID proofs
+  { name: "supervisorIdProof", maxCount: 5 },
 ]);
 
 // ✅ Add Supervisor Function
@@ -359,7 +436,7 @@ export const addSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      permanentAddress, role, joiningDate, bankAccount,
+      permanentAddress, role, contractorType, joiningDate, bankAccount,
       bankCode, password
     } = req.body;
 
@@ -407,6 +484,10 @@ export const addSupervisor = async (req, res) => {
       if (typeof permanentAddress === 'string') parsedPermanentAddress = JSON.parse(permanentAddress);
     } catch (e) {
       console.log("Address parsing error:", e);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid address format. Please provide valid JSON for address fields"
+      });
     }
 
     // Create and save new Supervisor record
@@ -422,6 +503,7 @@ export const addSupervisor = async (req, res) => {
       address: parsedAddress,
       permanentAddress: parsedPermanentAddress,
       role,
+      contractorType,
       joiningDate,
       bankAccount,
       bankCode,
@@ -448,13 +530,35 @@ export const addSupervisor = async (req, res) => {
 // ✅ Get All Supervisors
 export const getSupervisors = async (req, res) => {
   try {
-    const supervisors = await Supervisor.find()
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const supervisors = await Supervisor.find(query)
       .populate("userId", "-password")
+      .skip(skip)
+      .limit(parseInt(limit))
       .lean();
+
+    const total = await Supervisor.countDocuments(query);
 
     return res.status(200).json({ 
       success: true, 
-      data: supervisors 
+      data: supervisors,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     return res.status(500).json({ 
@@ -471,23 +575,18 @@ export const getSupervisorById = async (req, res) => {
   try {
     let supervisor;
 
-    // Check if ID is a number (auto-increment ID)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOne({ _id: parseInt(id) })
-        .populate("userId", "-password")
-        .lean();
-    } else {
-      // Try as mongoose ObjectId first
+    // Try as mongoose ObjectId first
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
       supervisor = await Supervisor.findById(id)
         .populate("userId", "-password")
         .lean();
+    }
 
-      // If not found, try as userId
-      if (!supervisor) {
-        supervisor = await Supervisor.findOne({ userId: id })
-          .populate("userId", "-password")
-          .lean();
-      }
+    // If not found, try as userId
+    if (!supervisor) {
+      supervisor = await Supervisor.findOne({ userId: id })
+        .populate("userId", "-password")
+        .lean();
     }
 
     if (!supervisor) {
@@ -518,17 +617,14 @@ export const updateSupervisor = async (req, res) => {
 
     let supervisor;
     
-    // Check if ID is a number (auto-increment ID)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOne({ _id: parseInt(id) });
-    } else {
-      // Try as mongoose ObjectId first
+    // Try as mongoose ObjectId first
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
       supervisor = await Supervisor.findById(id);
-      
-      // If not found, try as userId
-      if (!supervisor) {
-        supervisor = await Supervisor.findOne({ userId: id });
-      }
+    }
+    
+    // If not found, try as userId
+    if (!supervisor) {
+      supervisor = await Supervisor.findOne({ userId: id });
     }
 
     if (!supervisor) {
@@ -541,7 +637,7 @@ export const updateSupervisor = async (req, res) => {
     // Update basic fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 
-      'role', 'joiningDate', 'bankAccount', 'bankCode'
+      'role', 'contractorType', 'joiningDate', 'bankAccount', 'bankCode'
     ];
     
     fieldsToUpdate.forEach(field => {
@@ -569,6 +665,10 @@ export const updateSupervisor = async (req, res) => {
           : updateData.address;
       } catch (e) {
         console.log("Address parsing error:", e);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid address format. Please provide valid JSON"
+        });
       }
     }
 
@@ -579,11 +679,22 @@ export const updateSupervisor = async (req, res) => {
           : updateData.permanentAddress;
       } catch (e) {
         console.log("Permanent address parsing error:", e);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid permanent address format. Please provide valid JSON"
+        });
       }
     }
 
     // Update files if uploaded
     if (req.files?.photo) {
+      // Delete old photo if exists
+      if (supervisor.photo) {
+        const oldPhotoPath = path.join(process.cwd(), 'public', supervisor.photo);
+        if (fs.existsSync(oldPhotoPath)) {
+          fs.unlinkSync(oldPhotoPath);
+        }
+      }
       supervisor.photo = `/uploads/${req.files.photo[0].filename}`;
     }
     
@@ -592,17 +703,16 @@ export const updateSupervisor = async (req, res) => {
       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
     }
 
-    supervisor.updatedAt = new Date().toISOString();
+    supervisor.updatedAt = new Date();
     await supervisor.save();
     
     // Also update the associated User record
-    if (updateData.name || updateData.email) {
-      await User.findByIdAndUpdate(supervisor.userId, {
-        $set: {
-          ...(updateData.name && { name: updateData.name }),
-          ...(updateData.email && { email: updateData.email })
-        }
-      });
+    const userUpdate = {};
+    if (updateData.name) userUpdate.name = updateData.name;
+    if (updateData.email) userUpdate.email = updateData.email;
+    
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(supervisor.userId, { $set: userUpdate });
     }
 
     return res.status(200).json({ 
@@ -626,17 +736,14 @@ export const deleteSupervisor = async (req, res) => {
     
     let supervisor;
     
-    // Check if ID is a number (auto-increment ID)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOneAndDelete({ _id: parseInt(id) });
-    } else {
-      // Try as mongoose ObjectId first
+    // Try as mongoose ObjectId first
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
       supervisor = await Supervisor.findByIdAndDelete(id);
-      
-      // If not found, try as userId
-      if (!supervisor) {
-        supervisor = await Supervisor.findOneAndDelete({ userId: id });
-      }
+    }
+    
+    // If not found, try as userId
+    if (!supervisor) {
+      supervisor = await Supervisor.findOneAndDelete({ userId: id });
     }
 
     if (!supervisor) {
@@ -648,6 +755,23 @@ export const deleteSupervisor = async (req, res) => {
 
     // Delete associated user
     await User.findByIdAndDelete(supervisor.userId);
+
+    // Delete associated files
+    if (supervisor.photo) {
+      const photoPath = path.join(process.cwd(), 'public', supervisor.photo);
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
+    if (supervisor.supervisorIdProof && supervisor.supervisorIdProof.length > 0) {
+      supervisor.supervisorIdProof.forEach(proof => {
+        const proofPath = path.join(process.cwd(), 'public', proof);
+        if (fs.existsSync(proofPath)) {
+          fs.unlinkSync(proofPath);
+        }
+      });
+    }
 
     return res.status(200).json({ 
       success: true, 
@@ -669,17 +793,14 @@ export const removeIdProof = async (req, res) => {
 
     let supervisor;
     
-    // Check if ID is a number (auto-increment ID)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOne({ _id: parseInt(id) });
-    } else {
-      // Try as mongoose ObjectId first
+    // Try as mongoose ObjectId first
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
       supervisor = await Supervisor.findById(id);
-      
-      // If not found, try as userId
-      if (!supervisor) {
-        supervisor = await Supervisor.findOne({ userId: id });
-      }
+    }
+    
+    // If not found, try as userId
+    if (!supervisor) {
+      supervisor = await Supervisor.findOne({ userId: id });
     }
 
     if (!supervisor) {
@@ -689,12 +810,26 @@ export const removeIdProof = async (req, res) => {
       });
     }
 
+    // Check if proof exists
+    if (!supervisor.supervisorIdProof.includes(proofUrl)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "ID proof not found for this supervisor" 
+      });
+    }
+
     // Filter out the proof to be removed
     supervisor.supervisorIdProof = supervisor.supervisorIdProof.filter(
       proof => proof !== proofUrl
     );
 
     await supervisor.save();
+
+    // Delete the file from server
+    const proofPath = path.join(process.cwd(), 'public', proofUrl);
+    if (fs.existsSync(proofPath)) {
+      fs.unlinkSync(proofPath);
+    }
 
     return res.status(200).json({ 
       success: true, 

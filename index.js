@@ -16,11 +16,6 @@ dotenv.config();
 
 // import routes
 import authRouter from './Routers/auth.js';
-
-import studentRouter from './Routers/studentRouter.js';
-import departmentRouter from "./Routers/departmentRouter.js"
-import staffRouter from "./Routers/staffRouter.js"
-
 import supervisorRouter from "./Routers/supervisorRouter.js"
 import contractorRouter from "./Routers/contractorRouter.js"
 import workersRouter from "./Routers/workersRouter.js"
@@ -41,11 +36,6 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Routes
 app.use('/api', authRouter);
-
-app.use("/college/student", studentRouter);
-app.use("/college/department", departmentRouter)
-app.use("/college/staff", staffRouter)
-
 app.use("/api",supervisorRouter)
 app.use("/api",contractorRouter)
 app.use("/api",workersRouter)

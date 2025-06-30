@@ -1,45 +1,3 @@
-// import mongoose from 'mongoose';
-
-// const addressSchema = new mongoose.Schema({
-//   street: String,
-//   city: String,
-//   state: String,
-//   zipCode: String,
-//   country: String,
-// });
-
-// const supervisorSchema = new mongoose.Schema({
-//   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-//   supervisorId: { type: String, unique: true },
-//   name: { type: String, required: true },
-//   dateOfBirth: { type: Date },
-//   password: { type: String },
-//   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
-//   maritalStatus: { 
-//     type: String, 
-//     enum: ["Single", "Married"], 
-//   },
-//   nationality: { type: String },
-//   bloodGroup: { type: String },
-//   email: { type: String, unique: true, lowercase: true },
-//   phone: { type: String },
-//   alternatePhone: { type: String },
-//   address: addressSchema,
-//   permanentAddress: addressSchema,
-//   role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
-//   joiningDate: { type: Date },
-//   bankAccount: { type: String, trim: true },
-//   bankCode: { type: String, trim: true },
-//   supervisorIdProof: [{ type: String }], // Changed from staffIdProof to supervisorIdProof
-//   photo: { type: String },
-// }, {
-//   timestamps: true,
-// });
-
-// const Supervisor = mongoose.model('Supervisor', supervisorSchema);
-
-// export default Supervisor;
-
 
 import mongoose from 'mongoose';
 import mongooseSequence from 'mongoose-sequence';
@@ -73,7 +31,11 @@ const supervisorSchema = new mongoose.Schema({
   alternatePhone: { type: String },
   address: addressSchema,
   permanentAddress: addressSchema,
-  role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
+  role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"]},
+  contractorType: {
+    type: String,
+    enum: ['MasonHeader', 'CentringsHeader', 'SteelHeader', 'Electrician', 'Plumber', 'Carpenter']
+  },
   joiningDate: { 
     type: String,
     set: function(date) {
@@ -139,78 +101,3 @@ supervisorSchema.pre('save', function(next) {
 const Supervisor = mongoose.model('Supervisor', supervisorSchema);
 
 export default Supervisor;
-
-
-
-// import mongoose from 'mongoose';
-// import mongooseSequence from 'mongoose-sequence';
-
-// const AutoIncrement = mongooseSequence(mongoose);
-
-// const addressSchema = new mongoose.Schema({
-//   street: String,
-//   city: String,
-//   state: String,
-//   zipCode: String,
-//   country: String,
-// });
-
-// const supervisorSchema = new mongoose.Schema({
-//   _id: Number, // This will be our auto-incrementing 
-//   userId: { type: Number, ref: "User", required: true },
-//   // userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-//   supervisorId: { type: String, unique: true },
-//   name: { type: String, required: true },
-//   dateOfBirth: { 
-//     type: String,
-//     set: function(date) {
-//       if (date instanceof Date) {
-//         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-//         const day = date.getDate().toString().padStart(2, '0');
-//         const year = date.getFullYear();
-//         return `${month}/${day}/${year}`;
-//       }
-//       return date;
-//     }
-//   },
-//   password: { type: String },
-//   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
-//   maritalStatus: { 
-//     type: String, 
-//     enum: ["Single", "Married"], 
-//   },
-//   nationality: { type: String },
-//   bloodGroup: { type: String },
-//   email: { type: String, unique: true, lowercase: true },
-//   phone: { type: String },
-//   alternatePhone: { type: String },
-//   address: addressSchema,
-//   permanentAddress: addressSchema,
-//   role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
-//   joiningDate: { 
-//     type: String,
-//     set: function(date) {
-//       if (date instanceof Date) {
-//         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-//         const day = date.getDate().toString().padStart(2, '0');
-//         const year = date.getFullYear();
-//         return `${month}/${day}/${year}`;
-//       }
-//       return date;
-//     }
-//   },
-//   bankAccount: { type: String, trim: true },
-//   bankCode: { type: String, trim: true },
-//   supervisorIdProof: [{ type: String }],
-//   photo: { type: String },
-// }, {
-//   timestamps: true,
-//   _id: false // Disable default _id since we're using our own
-// });
-
-// // Apply auto-increment plugin
-// supervisorSchema.plugin(AutoIncrement, {inc_field: '_id'});
-
-// const Supervisor = mongoose.model('Supervisor', supervisorSchema);
-
-// export default Supervisor;
