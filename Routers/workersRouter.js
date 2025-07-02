@@ -5,7 +5,6 @@ import {
   getWorkerById,
   updateWorker,
   deleteWorker,
-  removeIdProof,
   upload
 } from "../Controllers/workersController.js";
 
@@ -17,8 +16,6 @@ router.post("/workers", upload,authMiddleware, addWorker);
 router.get("/workers",authMiddleware, getWorkers);
 router.get("/workers/:id",authMiddleware, getWorkerById);
 router.put("/workers/:id", upload,authMiddleware, updateWorker);
-router.delete("/workers/:id",authMiddleware, deleteWorker);
-//  Remove ID Proof
-router.delete("/:id/proofs/:proofUrl", removeIdProof);
+router.delete("/workers/:id",authMiddleware, deleteWorker); 
 
 export default router;

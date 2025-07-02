@@ -122,51 +122,28 @@
 // export default Worker;
 
 
-
 import mongoose from 'mongoose';
-import mongooseSequence from 'mongoose-sequence';
+import AutoIncrement from 'mongoose-sequence';
 
-const AutoIncrement = mongooseSequence(mongoose);
-
-// Format date to MM/DD/YYYY
-function formatDate(date) {
-  if (!date) return null;
-
-  if (date instanceof Date) {
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${month}/${day}/${year}`;
-  }
-
-  if (typeof date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
-    return date;
-  }
-
-  const parsedDate = new Date(date);
-  if (!isNaN(parsedDate.getTime())) {
-    const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = parsedDate.getDate().toString().padStart(2, '0');
-    const year = parsedDate.getFullYear();
-    return `${month}/${day}/${year}`;
-  }
-
-  return date;
-}
-
-// Address schema (subdocument)
+// Address sub-schema
 const addressSchema = new mongoose.Schema({
-  street: { type: String },
-  city: { type: String },
-  state: { type: String },
-  zipCode: { type: String },
-  country: { type: String }
-}, { _id: false });
+  street: String,
+  city: String,
+  state: String,
+  postalCode: String,
+  country: String
+});
+
+// Date formatting function
+const formatDate = (date) => {
+  return new Date(date).toISOString().split('T')[0];
+};
 
 // Worker schema
 const workerSchema = new mongoose.Schema({
   _id: { type: Number },
   userId: { type: Number, ref: "User", required: true },
+  contractorRole: { type: mongoose.Schema.Types.ObjectId, ref: "Contractor", required: true },
   name: { type: String, required: true },
   password: { type: String, select: false },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
@@ -174,20 +151,6 @@ const workerSchema = new mongoose.Schema({
   phone: { type: String },
   alternatePhone: { type: String },
   address: addressSchema,
-  contractorRole: {
-    type: String,
-    enum: [
-      'Centering Contractor', 
-      'Steel Contractor', 
-      'Mason Contractor', 
-      'Carpenter Contractor', 
-      'Plumber Contractor', 
-      'Electrician Contractor', 
-      'Painter Contractor', 
-      'Tiles Contractor'
-    ],
-    required: true
-  },
   centeringRole: {
     type: String,
     enum: ["Fitter", "Helper", "Temporary Centering Worker"],
@@ -251,43 +214,22 @@ const workerSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for role visibility
-workerSchema.virtual('visibleRoles').get(function() {
-  const roles = {};
-  
-  switch(this.contractorRole) {
-    case 'Centering Contractor':
-      roles.centeringRole = this.centeringRole;
-      break;
-    case 'Steel Contractor':
-      roles.steelWorkerRole = this.steelWorkerRole;
-      break;
-    case 'Mason Contractor':
-      roles.masonRole = this.masonRole;
-      break;
-    case 'Carpenter Contractor':
-      roles.carpenterRole = this.carpenterRole;
-      break;
-    case 'Plumber Contractor':
-      roles.plumberRole = this.plumberRole;
-      break;
-    case 'Electrician Contractor':
-      roles.electricianRole = this.electricianRole;
-      break;
-    case 'Painter Contractor':
-      roles.painterRole = this.painterRole;
-      break;
-    case 'Tiles Contractor':
-      roles.tilesWorkerRole = this.tilesWorkerRole;
-      break;
-  }
-  
-  return roles;
+// Auto-increment plugin
+workerSchema.plugin(AutoIncrement(mongoose), {
+  id: 'worker_id_counter',
+  inc_field: '_id'
 });
-  
-// Middleware to validate role consistency
-workerSchema.pre('save', function(next) {
-  // Reset all role fields
+
+// Middleware: dynamically set role based on contractorRole
+workerSchema.pre('validate', async function(next) {
+  const Contractor = mongoose.model('Contractor');
+
+  const contractor = await Contractor.findById(this.contractorRole);
+  if (!contractor) {
+    return next(new Error("Invalid contractor reference."));
+  }
+
+  // Reset all roles to null
   this.centeringRole = null;
   this.steelWorkerRole = null;
   this.masonRole = null;
@@ -296,9 +238,9 @@ workerSchema.pre('save', function(next) {
   this.electricianRole = null;
   this.painterRole = null;
   this.tilesWorkerRole = null;
-  
-  // Set the appropriate role based on contractorRole
-  switch(this.contractorRole) {
+
+  // Dynamically set correct role based on contractor.contractorRole
+  switch(contractor.contractorRole) {
     case 'Centering Contractor':
       this.centeringRole = this.centeringRole || 'Fitter';
       break;
@@ -324,15 +266,25 @@ workerSchema.pre('save', function(next) {
       this.tilesWorkerRole = this.tilesWorkerRole || 'Fitter';
       break;
   }
-  
+
   this.updatedAt = formatDate(new Date());
   next();
 });
 
-// Apply auto-increment plugin
-workerSchema.plugin(AutoIncrement, {
-  id: 'worker_id_counter',
-  inc_field: '_id'
+// Virtual to return only visible role
+workerSchema.virtual('visibleRoles').get(function() {
+  const roles = {
+    centeringRole: this.centeringRole,
+    steelWorkerRole: this.steelWorkerRole,
+    masonRole: this.masonRole,
+    carpenterRole: this.carpenterRole,
+    plumberRole: this.plumberRole,
+    electricianRole: this.electricianRole,
+    painterRole: this.painterRole,
+    tilesWorkerRole: this.tilesWorkerRole
+  };
+
+  return Object.fromEntries(Object.entries(roles).filter(([_, val]) => val !== null));
 });
 
 const Worker = mongoose.model('Worker', workerSchema);

@@ -1,5 +1,4 @@
-
- import Contractor from "../models/Contractor.js";
+import Contractor from "../models/Contractor.js";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import multer from "multer";
@@ -33,15 +32,15 @@ export const addContractor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      permanentAddress, contractorType, joiningDate, bankAccount,
+      permanentAddress, contractorRole, joiningDate, bankAccount,
       bankCode, password
     } = req.body;
 
     // Validate required fields
-    if (!name || !email || !phone || !contractorType || !password) {
+    if (!name || !email || !phone || !password || !contractorRole) {
       return res.status(400).json({ 
         success: false, 
-        message: "Required fields: name, email, phone, password, contractorType" 
+        message: "Required fields: name, email, phone, password, contractorRole" 
       });
     }
 
@@ -94,7 +93,7 @@ export const addContractor = async (req, res) => {
       alternatePhone,
       address: parsedAddress,
       permanentAddress: parsedPermanentAddress,
-      contractorType,
+      contractorRole,
       joiningDate,
       bankAccount,
       bankCode,
@@ -123,7 +122,14 @@ export const addContractor = async (req, res) => {
 // ✅ Get All Contractors
 export const getContractors = async (req, res) => {
   try {
-    const contractors = await Contractor.find()
+    const { contractorRole } = req.query;
+    const filter = {};
+    
+    if (contractorRole) {
+      filter.contractorRole = contractorRole;
+    }
+
+    const contractors = await Contractor.find(filter)
       .populate("userId", "-password")
       .lean();
 
@@ -204,7 +210,7 @@ export const updateContractor = async (req, res) => {
     // Update basic fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 
-      'contractorType', 'joiningDate', 'bankAccount', 'bankCode'
+      'contractorRole', 'joiningDate', 'bankAccount', 'bankCode'
     ];
     
     fieldsToUpdate.forEach(field => {
@@ -242,6 +248,18 @@ export const updateContractor = async (req, res) => {
     if (req.files?.contractorIdProof) {
       const newIdProofs = req.files.contractorIdProof.map(file => `/uploads/${file.filename}`);
       contractor.contractorIdProof = [...contractor.contractorIdProof, ...newIdProofs];
+    }
+
+    // Handle password update
+    if (updateData.password) {
+      const hashedPassword = await bcrypt.hash(updateData.password, 10);
+      contractor.password = hashedPassword;
+      
+      // Also update user password
+      await User.findOneAndUpdate(
+        { _id: contractor.userId },
+        { $set: { password: hashedPassword } }
+      );
     }
 
     await contractor.save();
@@ -297,6 +315,23 @@ export const deleteContractor = async (req, res) => {
     // Delete associated user
     await User.findOneAndDelete({ _id: contractor.userId });
 
+    // Clean up uploaded files
+    if (contractor.photo) {
+      const photoPath = path.join(process.cwd(), 'public', contractor.photo);
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
+    if (contractor.contractorIdProof && contractor.contractorIdProof.length > 0) {
+      contractor.contractorIdProof.forEach(proof => {
+        const proofPath = path.join(process.cwd(), 'public', proof);
+        if (fs.existsSync(proofPath)) {
+          fs.unlinkSync(proofPath);
+        }
+      });
+    }
+
     return res.status(200).json({ 
       success: true, 
       message: "Contractor deleted successfully" 
@@ -331,6 +366,12 @@ export const removeIdProof = async (req, res) => {
       });
     }
 
+    // Remove the file from server
+    const proofPath = path.join(process.cwd(), 'public', proofUrl);
+    if (fs.existsSync(proofPath)) {
+      fs.unlinkSync(proofPath);
+    }
+
     // Filter out the proof to be removed
     contractor.contractorIdProof = contractor.contractorIdProof.filter(
       proof => proof !== proofUrl
@@ -348,6 +389,44 @@ export const removeIdProof = async (req, res) => {
       success: false, 
       message: "Server error", 
       error: error.message 
+    });
+  }
+};
+
+// ✅ Get Contractors by Role
+export const getContractorsByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+    
+    if (![
+      'Centering Contractor', 
+      'Steel Contractor', 
+      'Mason Contractor', 
+      'Carpenter Contractor', 
+      'Plumber Contractor', 
+      'Electrician Contractor', 
+      'Painter Contractor', 
+      'Tiles Contractor'
+    ].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid contractor role"
+      });
+    }
+
+    const contractors = await Contractor.find({ contractorRole: role })
+      .populate("userId", "-password")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: contractors
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
     });
   }
 };

@@ -37,9 +37,18 @@ const contractorSchema = new mongoose.Schema({
       return this.formatDate(date);
     }
   },
-  contractorType: {
+  contractorRole: {
     type: String,
-    enum: ['MasonHeader', 'CentringsHeader', 'SteelHeader', 'Electrician', 'Plumber', 'Carpenter'],
+    enum: [
+      'Centering Contractor', 
+      'Steel Contractor', 
+      'Mason Contractor', 
+      'Carpenter Contractor', 
+      'Plumber Contractor', 
+      'Electrician Contractor', 
+      'Painter Contractor', 
+      'Tiles Contractor'
+    ],
     required: true
   },
   bankAccount: { type: String, trim: true },
