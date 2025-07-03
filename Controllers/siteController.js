@@ -63,7 +63,7 @@ export const addSite = async (req, res) => {
       siteMap,
       createdAt: formatDate(new Date())
     });
-
+    
     await newSite.save();
 
     const populatedSite = await Site.findById(newSite._id).populate("client").lean();

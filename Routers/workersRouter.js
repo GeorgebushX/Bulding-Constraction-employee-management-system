@@ -5,6 +5,7 @@ import {
   getWorkerById,
   updateWorker,
   deleteWorker,
+  getWorkerTypes,
   upload
 } from "../Controllers/workersController.js";
 
@@ -17,5 +18,7 @@ router.get("/workers",authMiddleware, getWorkers);
 router.get("/workers/:id",authMiddleware, getWorkerById);
 router.put("/workers/:id", upload,authMiddleware, updateWorker);
 router.delete("/workers/:id",authMiddleware, deleteWorker); 
+
+router.get('/contractors/:contractorId/worker-types',authMiddleware, getWorkerTypes);
 
 export default router;
