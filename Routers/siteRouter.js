@@ -12,7 +12,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/site", upload,authMiddleware, addSite);
+router.post("/site",upload,authMiddleware, addSite);
 router.get("/site",authMiddleware, getSites);
 router.get("/site/:id",authMiddleware, getSiteById);
 router.put("/site/:id", upload,authMiddleware, updateSite);

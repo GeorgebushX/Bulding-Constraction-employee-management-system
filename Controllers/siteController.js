@@ -40,10 +40,10 @@ export const addSite = async (req, res) => {
       startDate, endDate, status, budget, notes
     } = req.body;
 
-    if (!client || !siteName || !location) {
+    if ( !siteName ) {
       return res.status(400).json({
         success: false,
-        message: "Required fields: client, siteName, location"
+        message: "Required fields: siteName"
       });
     }
 
