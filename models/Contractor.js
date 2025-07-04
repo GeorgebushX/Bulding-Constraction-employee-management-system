@@ -75,7 +75,7 @@ const contractorSchema = new mongoose.Schema({
         enum: ["Fitter", "Helper", "Temporary Carpenter"],
         default: null
       },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
+      workers: [{ type: mongoose.Schema.Types.ObjectId  , ref: 'Worker' }]
     },
     plumber: {
       workerType: { 
