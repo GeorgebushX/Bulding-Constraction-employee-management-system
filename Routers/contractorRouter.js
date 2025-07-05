@@ -5,6 +5,7 @@ import {
   getContractorById,
   updateContractor,
   deleteContractor,
+  deleteAllContractors,
   upload
 } from "../Controllers/contractorController.js";
 
@@ -17,6 +18,7 @@ router.get("/contractors",authMiddleware, getContractors);
 router.get("/contractors/:id",authMiddleware, getContractorById);
 router.put("/contractors/:id", upload,authMiddleware, updateContractor);
 router.delete("/contractors/:id",authMiddleware, deleteContractor);
+router.delete("/contractors",authMiddleware, deleteAllContractors);
 
 
 export default router;
