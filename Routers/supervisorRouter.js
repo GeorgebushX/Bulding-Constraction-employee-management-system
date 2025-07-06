@@ -21,12 +21,12 @@
 
 import express from "express";
 import {
-  addSupervisor,
-  getSupervisors,
+  createSupervisor,
+  getAllSupervisors,
   getSupervisorById,
-  updateSupervisor,
-  deleteSupervisor,
-  removeIdProof,
+  updateSupervisorById,
+  deleteSupervisorById,
+  deleteAllSupervisors,  
   upload
 } from "../Controllers/supervisorController.js";
 
@@ -34,11 +34,12 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/supervisor", upload,authMiddleware, addSupervisor);
-router.get("/supervisor",authMiddleware, getSupervisors);
+router.post("/supervisor", upload,authMiddleware, createSupervisor);
+router.get("/supervisor",authMiddleware, getAllSupervisors);
 router.get("/supervisor/:id",authMiddleware, getSupervisorById);
-router.put("/supervisor/:id", upload,authMiddleware, updateSupervisor);
-router.delete("/supervisor/:id",authMiddleware, deleteSupervisor);
-router.delete("/:id/id-proof/:proofUrl", removeIdProof);
+router.put("/supervisor/:id", upload,authMiddleware, updateSupervisorById);
+router.delete("/supervisor/:id",authMiddleware, deleteSupervisorById);
+router.delete("/supervisor",authMiddleware, deleteAllSupervisors);
+// router.delete("/:id/id-proof/:proofUrl", removeIdProof);
 
 export default router;
