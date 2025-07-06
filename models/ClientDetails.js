@@ -3,7 +3,7 @@ import mongooseSequence from 'mongoose-sequence';
 
 const AutoIncrement = mongooseSequence(mongoose);
 
-// Helper function to format dates as MM/DD/YYYY
+// Helper function to format dates as DD/MM/YYYY
 function formatDate(date) {
   if (!date) return null;
 
@@ -12,7 +12,7 @@ function formatDate(date) {
     const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
     const day = parsedDate.getDate().toString().padStart(2, '0');
     const year = parsedDate.getFullYear();
-    return `${month}/${day}/${year}`;
+    return `${day}/${month}/${year}`;
   }
 
   return date;
