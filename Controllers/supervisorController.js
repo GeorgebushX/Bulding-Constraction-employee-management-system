@@ -601,8 +601,8 @@ export const createSupervisor = async (req, res) => {
 // GET - Get all supervisors
 export const getAllSupervisors = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', supervisorType } = req.query;
-    const skip = (page - 1) * limit;
+    const { search = '', supervisorType } = req.query;
+    // const skip = (page - 1) * limit;
 
     const query = {};
     if (search) {
@@ -619,8 +619,8 @@ export const getAllSupervisors = async (req, res) => {
 
     const supervisors = await Supervisor.find(query)
       .populate("userId", "-password")
-      .skip(skip)
-      .limit(parseInt(limit))
+      // .skip(skip)
+      // .limit(parseInt(limit))
       .lean();
 
     const total = await Supervisor.countDocuments(query);
@@ -628,12 +628,12 @@ export const getAllSupervisors = async (req, res) => {
     return res.status(200).json({ 
       success: true, 
       data: supervisors,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit)
-      }
+      // pagination: {
+      //   total,
+      //   page: parseInt(page),
+      //   limit: parseInt(limit),
+      //   totalPages: Math.ceil(total / limit)
+      // }
     });
   } catch (error) {
     return res.status(500).json({ 
