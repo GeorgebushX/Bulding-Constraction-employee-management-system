@@ -563,7 +563,8 @@ export const createSupervisor = async (req, res) => {
 
     // Create and save new Supervisor record
     const newSupervisor = new Supervisor({
-      userId: newUser._id,
+      // userId: newUser._id,
+      userId: Number(newUser._id), 
       name,
       dateOfBirth,
       password: hashedPassword,

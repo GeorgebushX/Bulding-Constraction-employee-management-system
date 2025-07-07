@@ -33,6 +33,8 @@
 //     }
 // }
 // controllers/supervisorAttendanceController.js
+
+
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 
 // ✅ GET today's attendance
