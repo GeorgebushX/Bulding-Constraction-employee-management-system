@@ -600,10 +600,53 @@ export const createSupervisor = async (req, res) => {
 };
 
 // GET - Get all supervisors
+// export const getAllSupervisors = async (req, res) => {
+//   try {
+//     const { search = '', supervisorType } = req.query;
+//     // const skip = (page - 1) * limit;
+
+//     const query = {};
+//     if (search) {
+//       query.$or = [
+//         { name: { $regex: search, $options: 'i' } },
+//         { email: { $regex: search, $options: 'i' } },
+//         { phone: { $regex: search, $options: 'i' } }
+//       ];
+//     }
+    
+//     if (supervisorType) {
+//       query.supervisorType = supervisorType;
+//     }
+
+//     const supervisors = await Supervisor.find(query)
+//       .populate("userId", "-password")
+//       // .skip(skip)
+//       // .limit(parseInt(limit))
+//       .lean();
+
+//     const total = await Supervisor.countDocuments(query);
+
+//     return res.status(200).json({ 
+//       success: true, 
+//       data: supervisors,
+//       // pagination: {
+//       //   total,
+//       //   page: parseInt(page),
+//       //   limit: parseInt(limit),
+//       //   totalPages: Math.ceil(total / limit)
+//       // }
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ 
+//       success: false, 
+//       message: "Internal Server Error", 
+//       error: error.message 
+//     });
+//   }
+// };
 export const getAllSupervisors = async (req, res) => {
   try {
     const { search = '', supervisorType } = req.query;
-    // const skip = (page - 1) * limit;
 
     const query = {};
     if (search) {
@@ -618,23 +661,30 @@ export const getAllSupervisors = async (req, res) => {
       query.supervisorType = supervisorType;
     }
 
-    const supervisors = await Supervisor.find(query)
-      .populate("userId", "-password")
-      // .skip(skip)
-      // .limit(parseInt(limit))
+    // Get supervisors without populate
+    const supervisors = await Supervisor.find(query).lean();
+    
+    // Get associated users manually
+    const userIds = supervisors.map(s => s.userId);
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('-password')
       .lean();
+    
+    // Create a user map for easy lookup
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user._id] = user;
+    });
 
-    const total = await Supervisor.countDocuments(query);
+    // Combine data
+    const supervisorsWithUsers = supervisors.map(supervisor => ({
+      ...supervisor,
+      user: userMap[supervisor.userId] || null
+    }));
 
     return res.status(200).json({ 
       success: true, 
-      data: supervisors,
-      // pagination: {
-      //   total,
-      //   page: parseInt(page),
-      //   limit: parseInt(limit),
-      //   totalPages: Math.ceil(total / limit)
-      // }
+      data: supervisorsWithUsers
     });
   } catch (error) {
     return res.status(500).json({ 
@@ -644,25 +694,58 @@ export const getAllSupervisors = async (req, res) => {
     });
   }
 };
-
 // GET - Get supervisor by ID
+// export const getSupervisorById = async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     let supervisor;
+
+//     // Try as mongoose ObjectId first
+//     if (/^[0-9a-fA-F]{24}$/.test(id)) {
+//       supervisor = await Supervisor.findById(id)
+//         .populate("userId", "-password")
+//         .lean();
+//     }
+
+//     // If not found, try as userId
+//     if (!supervisor) {
+//       supervisor = await Supervisor.findOne({ userId: id })
+//         .populate("userId", "-password")
+//         .lean();
+//     }
+
+//     if (!supervisor) {
+//       return res.status(404).json({ 
+//         success: false, 
+//         message: "Supervisor not found" 
+//       });
+//     }
+
+//     return res.status(200).json({ 
+//       success: true, 
+//       data: supervisor 
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
 export const getSupervisorById = async (req, res) => {
   const { id } = req.params;
   try {
     let supervisor;
 
-    // Try as mongoose ObjectId first
-    if (/^[0-9a-fA-F]{24}$/.test(id)) {
-      supervisor = await Supervisor.findById(id)
-        .populate("userId", "-password")
-        .lean();
+    // First try as numeric ID
+    if (!isNaN(id)) {
+      supervisor = await Supervisor.findOne({ _id: Number(id) }).lean();
     }
-
+    
     // If not found, try as userId
-    if (!supervisor) {
-      supervisor = await Supervisor.findOne({ userId: id })
-        .populate("userId", "-password")
-        .lean();
+    if (!supervisor && !isNaN(id)) {
+      supervisor = await Supervisor.findOne({ userId: Number(id) }).lean();
     }
 
     if (!supervisor) {
@@ -672,9 +755,17 @@ export const getSupervisorById = async (req, res) => {
       });
     }
 
+    // Get user data separately
+    const user = await User.findOne({ _id: supervisor.userId })
+      .select('-password')
+      .lean();
+
     return res.status(200).json({ 
       success: true, 
-      data: supervisor 
+      data: {
+        ...supervisor,
+        user: user || null
+      }
     });
   } catch (error) {
     return res.status(500).json({ 
@@ -684,7 +775,6 @@ export const getSupervisorById = async (req, res) => {
     });
   }
 };
-
 // PUT - Update supervisor by ID
 export const updateSupervisorById = async (req, res) => {
   try {
