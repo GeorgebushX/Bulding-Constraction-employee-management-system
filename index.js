@@ -22,6 +22,7 @@ import workersRouter from "./Routers/workersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
 import attendanceSupervisor from "./Routers/AttendanceSupervisorRouter.js"
+import changePassword from "./Routers/settings.js"
 
 // connect to the database
 connectDatabase();
@@ -43,6 +44,7 @@ app.use("/api",workersRouter)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
 app.use("/api",attendanceSupervisor)
+app.use("/api",changePassword)
 
 
 // start the server
