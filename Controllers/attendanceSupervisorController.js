@@ -86,6 +86,17 @@ export const updateAttendance = async (req, res) => {
 };
 
 
+
+
+
+
+
+
+
+
+
+
+
 // import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 // import Supervisor from "../models/Supervisor.js";
 

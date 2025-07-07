@@ -20,7 +20,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 router.get("/supervisor/attendance", authMiddleware, defaultAttendance, getAttendance);
-router.put("/supervisor/attendance/:id", updateAttendance);
+router.put("/supervisor/attendance/:id",authMiddleware, updateAttendance);
 
 export default router;
 
