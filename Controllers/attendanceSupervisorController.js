@@ -32,61 +32,114 @@
 //         res.status(500).json({success:false, message: error.message})
 //     }
 // }
-
-
+// controllers/supervisorAttendanceController.js
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
-import Supervisor from "../models/Supervisor.js";
 
 // ✅ GET today's attendance
 export const getAttendance = async (req, res) => {
-    try {
-        const date = new Date().toISOString().split("T")[0];
+  try {
+    const date = new Date().toISOString().split("T")[0];
 
-        const data = await SupervisorAttendance.find({ date })
-            .populate({
-                path: "supervisorId",
-                populate: {
-                    path: "userId" // assuming Supervisor has userId ref
-                }
-            });
+    const data = await SupervisorAttendance.find({ date }).populate({
+      path: "supervisorId",
+      populate: {
+        path: "userId", // Supervisor → userId (Number)
+        model: "User",
+      },
+    });
 
-        res.status(200).json({ success: true, data });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 // ✅ UPDATE attendance status
-// ✔️ If you want to allow editing multiple times, set allowEdit = true
-// ❌ If you want to lock it after first status update, set allowEdit = false
 const allowEdit = true;
 
 export const updateAttendance = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
 
-        const date = new Date().toISOString().split("T")[0];
+    const date = new Date().toISOString().split("T")[0];
 
-        // First, find the document by ID and date
-        const attendance = await SupervisorAttendance.findOne({ _id: id, date });
+    const attendance = await SupervisorAttendance.findOne({ _id: id, date });
 
-        if (!attendance) {
-            return res.status(404).json({ success: false, message: "Attendance not found for today" });
-        }
-
-        if (!allowEdit && attendance.status !== null) {
-            return res.status(400).json({ success: false, message: "Attendance already marked. Edit not allowed." });
-        }
-
-        attendance.status = status;
-        await attendance.save();
-
-        res.status(200).json({ success: true, message: "Attendance updated successfully", attendance });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+    if (!attendance) {
+      return res.status(404).json({ success: false, message: "Attendance not found for today" });
     }
+
+    if (!allowEdit && attendance.status !== null) {
+      return res.status(400).json({ success: false, message: "Attendance already marked. Edit not allowed." });
+    }
+
+    attendance.status = status;
+    await attendance.save();
+
+    res.status(200).json({ success: true, message: "Attendance updated successfully", attendance });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
+
+
+// import SupervisorAttendance from "../models/AttendanceSupervisor.js";
+// import Supervisor from "../models/Supervisor.js";
+
+// // ✅ GET today's attendance
+// export const getAttendance = async (req, res) => {
+//     try {
+//         const date = new Date().toISOString().split("T")[0];
+
+//         const data = await SupervisorAttendance.find({ date })
+//             .populate({
+//                 path: "supervisorId",
+//                 populate: {
+//                     path: "userId" // assuming Supervisor has userId ref
+//                 }
+//             });
+
+//         res.status(200).json({ success: true, data });
+//     } catch (error) {
+//         res.status(500).json({ success: false, message: error.message });
+//     }
+// };
+
+// // ✅ UPDATE attendance status
+// // ✔️ If you want to allow editing multiple times, set allowEdit = true
+// // ❌ If you want to lock it after first status update, set allowEdit = false
+// const allowEdit = true;
+
+// export const updateAttendance = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const { status } = req.body;
+
+//         const date = new Date().toISOString().split("T")[0];
+
+//         // First, find the document by ID and date
+//         const attendance = await SupervisorAttendance.findOne({ _id: id, date });
+
+//         if (!attendance) {
+//             return res.status(404).json({ success: false, message: "Attendance not found for today" });
+//         }
+
+//         if (!allowEdit && attendance.status !== null) {
+//             return res.status(400).json({ success: false, message: "Attendance already marked. Edit not allowed." });
+//         }
+
+//         attendance.status = status;
+//         await attendance.save();
+
+//         res.status(200).json({ success: true, message: "Attendance updated successfully", attendance });
+//     } catch (error) {
+//         res.status(500).json({ success: false, message: error.message });
+//     }
+// };
+
+
+
 
 
 
