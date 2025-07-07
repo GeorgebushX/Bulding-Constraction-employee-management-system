@@ -15,7 +15,11 @@ const addressSchema = new mongoose.Schema({
 
 const supervisorSchema = new mongoose.Schema({
   _id: Number, // Auto-incrementing ID
-  userId: { type: Number, ref: "User", required: true },
+  userId: {
+    type: Number, // ✅ MUST be Number
+    ref: "User",
+    required: true,
+  },
  
   name: { type: String, required: true },
   dateOfBirth: { 
