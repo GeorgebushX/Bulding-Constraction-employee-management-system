@@ -40,6 +40,5 @@ router.get("/supervisor/:id",authMiddleware, getSupervisorById);
 router.put("/supervisor/:id", upload,authMiddleware, updateSupervisorById);
 router.delete("/supervisor/:id",authMiddleware, deleteSupervisorById);
 router.delete("/supervisor",authMiddleware, deleteAllSupervisors);
-// router.delete("/:id/id-proof/:proofUrl", removeIdProof);
 
 export default router;
