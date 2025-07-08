@@ -1,40 +1,28 @@
-// import mongoose from "mongoose";
-// import AutoIncrementFactory from "mongoose-sequence";
 
-// const AutoIncrement = AutoIncrementFactory(mongoose);
+// import mongoose from "mongoose";
 
 // const AttendanceSupervisorSchema = new mongoose.Schema({
-//   _id: Number, // Auto-incrementing numeric ID
-//   date: {
-//     type: String,
-//     required: true,
-//   },
-//   supervisorId: {
-//     type: Number, // ✅ Match the numeric _id of Supervisor
+//   _id: { type: Number }, // This will be the same as supervisorId
+//   date: { type: String, required: true },
+//   supervisorId: { 
+//     type: Number,
 //     ref: "Supervisor",
 //     required: true,
 //   },
-
 //   status: {
 //     type: String,
 //     enum: ["Fullday", "Halfday", "overtime"],
 //     default: null,
-//   },
-// }, { _id: true });
+//   }
+// }, { timestamps: true }); // _id: false to prevent automatic _id generation
 
-// AttendanceSupervisorSchema.plugin(AutoIncrement, {
-//   id: "attendance_seq",
-//   inc_field: "_id",
-//   start_seq: 1,
-//   disable_hooks: false // Ensure hooks are enabled for proper sequencing
-
+// // Ensure _id = supervisorId
+// AttendanceSupervisorSchema.pre('save', function(next) {
+//   this._id = this.supervisorId;
+//   next();
 // });
 
-// const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
-// export default SupervisorAttendance;
-
-
-
+// export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
 
 
 
@@ -42,7 +30,7 @@
 import mongoose from "mongoose";
 
 const AttendanceSupervisorSchema = new mongoose.Schema({
-  // _id: { type: Number }, // This will be the same as supervisorId
+  _id: { type: Number }, // This will be manually set to supervisorId
   date: { type: String, required: true },
   supervisorId: { 
     type: Number,
@@ -54,20 +42,20 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     enum: ["Fullday", "Halfday", "overtime"],
     default: null,
   }
-}, { timestamps: true }); // _id: false to prevent automatic _id generation
+}, { 
+  timestamps: true,
+  // No need for _id: false since we've explicitly defined _id
+});
 
-// Ensure _id = supervisorId
-// AttendanceSupervisorSchema.pre('save', function(next) {
-//   this._id = this.supervisorId;
-//   next();
-// });
+// Set _id to be equal to supervisorId before validation
+AttendanceSupervisorSchema.pre('validate', function(next) {
+  if (!this._id) {
+    this._id = this.supervisorId;
+  }
+  next();
+});
 
 export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
-
-
-
-
-
 
 
 
