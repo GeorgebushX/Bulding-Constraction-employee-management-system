@@ -460,6 +460,8 @@
 
 
 
+
+// controllers/supervisorController.js
 import Supervisor from "../models/Supervisor.js";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
@@ -563,8 +565,7 @@ export const createSupervisor = async (req, res) => {
 
     // Create and save new Supervisor record
     const newSupervisor = new Supervisor({
-      // userId: newUser._id,
-      userId: Number(newUser._id), 
+      userId: newUser._id, // Use the same ID as the User
       name,
       dateOfBirth,
       password: hashedPassword,
@@ -573,7 +574,7 @@ export const createSupervisor = async (req, res) => {
       phone,
       alternatePhone,
       address: parsedAddress,
-      role,
+      role: "Supervisor", // Ensure role is Supervisor
       supervisorType,
       joiningDate,
       bankName,
@@ -587,7 +588,10 @@ export const createSupervisor = async (req, res) => {
     return res.status(201).json({ 
       success: true, 
       message: "Supervisor created successfully", 
-      data: newSupervisor 
+      data: {
+        user: newUser,
+        supervisor: newSupervisor
+      }
     });
   } catch (error) {
     console.error("Error creating supervisor:", error);
@@ -598,6 +602,153 @@ export const createSupervisor = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+
+
+
+// import Supervisor from "../models/Supervisor.js";
+// import User from "../models/User.js";
+// import bcrypt from "bcrypt";
+// import multer from "multer";
+// import path from "path";
+// import fs from "fs";
+
+// // Ensure upload directory exists
+// const uploadDir = path.join(process.cwd(), "public", "uploads");
+// if (!fs.existsSync(uploadDir)) {
+//   fs.mkdirSync(uploadDir, { recursive: true });
+// }
+
+// // Multer storage configuration
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, uploadDir);
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, Date.now() + path.extname(file.originalname));
+//   },
+// });
+
+// // Configure multer for file uploads
+// export const upload = multer({ 
+//   storage,
+//   limits: {
+//     fileSize: 5 * 1024 * 1024, // 5MB limit per file
+//   },
+//   fileFilter: (req, file, cb) => {
+//     const filetypes = /jpeg|jpg|png|pdf/;
+//     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+//     const mimetype = filetypes.test(file.mimetype);
+    
+//     if (extname && mimetype) {
+//       return cb(null, true);
+//     } else {
+//       cb(new Error('Only images (JPEG, JPG, PNG) and PDF files are allowed'));
+//     }
+//   }
+// }).fields([
+//   { name: "photo", maxCount: 1 },
+//   { name: "supervisorIdProof", maxCount: 5 },
+// ]);
+
+// // POST - Create a new supervisor
+// export const createSupervisor = async (req, res) => {
+//   try {
+//     const {
+//       name, email, dateOfBirth, gender, phone, alternatePhone, address,
+//       role, supervisorType, joiningDate, bankName, bankAccount,
+//       bankCode, password
+//     } = req.body;
+
+//     // Validate required fields
+//     if (!name || !email || !password) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: "Required fields: name, email, password" 
+//       });
+//     }
+
+//     // Check if email already exists
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: "User already registered with this email" 
+//       });
+//     }
+
+//     // Hash password
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Create and save new User
+//     const newUser = new User({ 
+//       name, 
+//       email, 
+//       password: hashedPassword, 
+//       role: "Supervisor" // Force role to Supervisor
+//     });
+//     await newUser.save();
+
+//     // Process uploaded files
+//     const photo = req.files?.photo ? `/uploads/${req.files.photo[0].filename}` : null;
+//     const supervisorIdProof = req.files?.supervisorIdProof 
+//       ? req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`) 
+//       : [];
+
+//     // Parse address if it's a string
+//     let parsedAddress = address;
+//     try {
+//       if (typeof address === 'string') parsedAddress = JSON.parse(address);
+//     } catch (e) {
+//       console.log("Address parsing error:", e);
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid address format. Please provide valid JSON for address"
+//       });
+//     }
+
+//     // Create and save new Supervisor record
+//     const newSupervisor = new Supervisor({
+//       // userId: newUser._id,
+//       userId: newUser._id, 
+//       name,
+//       dateOfBirth,
+//       password: hashedPassword,
+//       gender,
+//       email,
+//       phone,
+//       alternatePhone,
+//       address: parsedAddress,
+//       role,
+//       supervisorType,
+//       joiningDate,
+//       bankName,
+//       bankAccount,
+//       bankCode,
+//       supervisorIdProof,
+//       photo
+//     });
+
+//     await newSupervisor.save();
+//     return res.status(201).json({ 
+//       success: true, 
+//       message: "Supervisor created successfully", 
+//       data: newSupervisor 
+//     });
+//   } catch (error) {
+//     console.error("Error creating supervisor:", error);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
 
 // GET - Get all supervisors
 // export const getAllSupervisors = async (req, res) => {
