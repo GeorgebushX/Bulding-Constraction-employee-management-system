@@ -278,9 +278,6 @@
 // };
 
 
-
-
-
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 import Supervisor from "../models/Supervisor.js";
 
@@ -290,21 +287,20 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-// 1. GET all attendance records (with proper _id handling)
+// 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
       .populate({
         path: 'supervisorId',
         select: '_id name email photo'
-      })
-      .lean(); // Add lean() for better performance
+      });
 
     const formattedData = attendanceRecords.map(record => ({
-      _id: record._id, // This will now properly show the auto-incremented ID
+      id: record._id,
       date: formatDate(record.date),
-      supervisorId: {
-        _id: record.supervisorId._id,
+      supervisor: {
+        id: record.supervisorId._id,
         photo: record.supervisorId.photo,
         name: record.supervisorId.name,
         email: record.supervisorId.email
@@ -324,31 +320,28 @@ export const getAllAttendance = async (req, res) => {
   }
 };
 
-// 2. UPDATE Attendance by ID (with numeric ID handling)
+// 2. UPDATE Attendance by MongoDB ID
 export const updateAttendanceById = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Convert ID to number explicitly
-    const numericId = Number(id);
-    
-    if (isNaN(numericId)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid ID format. Must be a number"
+        error: "Invalid ID format"
       });
     }
 
-    if (!["Fullday", "Offday", "overtime"].includes(status)) {
+    if (!["Fullday", "Halfday", "Overtime", "Offday"].includes(status)) {
       return res.status(400).json({
         success: false,
         error: "Invalid status value"
       });
     }
 
-    const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
-      { _id: numericId },
+    const updatedAttendance = await SupervisorAttendance.findByIdAndUpdate(
+      id,
       { status },
       { new: true }
     ).populate('supervisorId', '_id name email photo');
@@ -362,12 +355,11 @@ export const updateAttendanceById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Attendance updated successfully",
-      attendance: {
-        _id: updatedAttendance._id, // Will show the numeric ID
+      data: {
+        id: updatedAttendance._id,
         date: formatDate(updatedAttendance.date),
-        supervisorId: {
-          _id: updatedAttendance.supervisorId._id,
+        supervisor: {
+          id: updatedAttendance.supervisorId._id,
           photo: updatedAttendance.supervisorId.photo,
           name: updatedAttendance.supervisorId.name,
           email: updatedAttendance.supervisorId.email
@@ -389,15 +381,16 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     const { supervisorId } = req.params;
     const { status, date } = req.body;
 
-    if (!["Fullday", "Halfday", "overtime"].includes(status)) {
+    if (!["Fullday", "Halfday", "Overtime"].includes(status)) {
       return res.status(400).json({
         success: false,
         error: "Invalid status value"
       });
     }
 
+    // Convert date from DD/MM/YYYY to YYYY-MM-DD
     const [day, month, year] = date.split('/');
-    const dbFormattedDate = `${year}-${month}-${day}`;
+    const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
       { 
@@ -405,24 +398,16 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
         date: dbFormattedDate
       },
       { status },
-      { new: true }
+      { new: true, upsert: true } // Create if doesn't exist
     ).populate('supervisorId', '_id name email photo');
-
-    if (!updatedAttendance) {
-      return res.status(404).json({
-        success: false,
-        error: "Attendance record not found for the given supervisor and date"
-      });
-    }
 
     res.status(200).json({
       success: true,
-      message: "Status updated successfully",
-      attendance: {
-        _id: updatedAttendance._id, // Will show the numeric ID
+      data: {
+        id: updatedAttendance._id,
         date: formatDate(updatedAttendance.date),
-        supervisorId: {
-          _id: updatedAttendance.supervisorId._id,
+        supervisor: {
+          id: updatedAttendance.supervisorId._id,
           photo: updatedAttendance.supervisorId.photo,
           name: updatedAttendance.supervisorId.name,
           email: updatedAttendance.supervisorId.email
@@ -437,3 +422,161 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     });
   }
 };
+
+
+// import SupervisorAttendance from "../models/AttendanceSupervisor.js";
+// import Supervisor from "../models/Supervisor.js";
+
+// // Helper function to format date
+// const formatDate = (dateString) => {
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // 1. GET all attendance records (with proper _id handling)
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo'
+//       })
+//       .lean(); // Add lean() for better performance
+
+//     const formattedData = attendanceRecords.map(record => ({
+//       _id: record._id, // This will now properly show the auto-incremented ID
+//       date: formatDate(record.date),
+//       supervisorId: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+// // 2. UPDATE Attendance by ID (with numeric ID handling)
+// export const updateAttendanceById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status } = req.body;
+
+//     // Convert ID to number explicitly
+//     const numericId = Number(id);
+    
+//     if (isNaN(numericId)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid ID format. Must be a number"
+//       });
+//     }
+
+//     if (!["Fullday", "Offday", "overtime"].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value"
+//       });
+//     }
+
+//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+//       { _id: numericId },
+//       { status },
+//       { new: true }
+//     ).populate('supervisorId', '_id name email photo');
+
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found"
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Attendance updated successfully",
+//       attendance: {
+//         _id: updatedAttendance._id, // Will show the numeric ID
+//         date: formatDate(updatedAttendance.date),
+//         supervisorId: {
+//           _id: updatedAttendance.supervisorId._id,
+//           photo: updatedAttendance.supervisorId.photo,
+//           name: updatedAttendance.supervisorId.name,
+//           email: updatedAttendance.supervisorId.email
+//         },
+//         status: updatedAttendance.status
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+// // 3. UPDATE Status by Supervisor ID and Date
+// export const updateStatusBySupervisorAndDate = async (req, res) => {
+//   try {
+//     const { supervisorId } = req.params;
+//     const { status, date } = req.body;
+
+//     if (!["Fullday", "Halfday", "overtime"].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value"
+//       });
+//     }
+
+//     const [day, month, year] = date.split('/');
+//     const dbFormattedDate = `${year}-${month}-${day}`;
+
+//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+//       { 
+//         supervisorId: Number(supervisorId),
+//         date: dbFormattedDate
+//       },
+//       { status },
+//       { new: true }
+//     ).populate('supervisorId', '_id name email photo');
+
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found for the given supervisor and date"
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Status updated successfully",
+//       attendance: {
+//         _id: updatedAttendance._id, // Will show the numeric ID
+//         date: formatDate(updatedAttendance.date),
+//         supervisorId: {
+//           _id: updatedAttendance.supervisorId._id,
+//           photo: updatedAttendance.supervisorId.photo,
+//           name: updatedAttendance.supervisorId.name,
+//           email: updatedAttendance.supervisorId.email
+//         },
+//         status: updatedAttendance.status
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };

@@ -33,10 +33,16 @@
 // const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
 // export default SupervisorAttendance;
 
+
+
+
+
+
+
 import mongoose from "mongoose";
 
 const AttendanceSupervisorSchema = new mongoose.Schema({
-  _id: { type: Number }, // This will be the same as supervisorId
+  // _id: { type: Number }, // This will be the same as supervisorId
   date: { type: String, required: true },
   supervisorId: { 
     type: Number,
@@ -48,15 +54,20 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     enum: ["Fullday", "Halfday", "overtime"],
     default: null,
   }
-}, { timestamps: true, _id: false }); // _id: false to prevent automatic _id generation
+}, { timestamps: true }); // _id: false to prevent automatic _id generation
 
 // Ensure _id = supervisorId
-AttendanceSupervisorSchema.pre('save', function(next) {
-  this._id = this.supervisorId;
-  next();
-});
+// AttendanceSupervisorSchema.pre('save', function(next) {
+//   this._id = this.supervisorId;
+//   next();
+// });
 
 export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
+
+
+
+
+
 
 
 
