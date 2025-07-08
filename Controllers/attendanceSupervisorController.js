@@ -1,72 +1,144 @@
+
+
+
 // import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 // import Supervisor from "../models/Supervisor.js";
 
-// // ✅ GET today's attendance with full population
-// export const getAttendance = async (req, res) => {
+// // Helper function to format date
+// const formatDate = (dateString) => {
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // 1. GET all attendance records
+// export const getAllAttendance = async (req, res) => {
 //   try {
-//     const date = new Date().toISOString().split("T")[0];
+//     // Find all attendance records and populate supervisor details
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo'
+//       });
 
-//     const data = await SupervisorAttendance.find({ date })
-//   .select("supervisorId status date")
-//   .populate({
-//     path: "supervisorId",
-//     model: "Supervisor",
-//     // populate: {
-//     //   path: "userId",
-//     //   model: "User",
-//     // }
-//   })
-//   .lean();
+//     // Format the response data
+//     const formattedData = attendanceRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisorId: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
 
-//     res.status(200).json({ success: true, data });
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
 //   } catch (error) {
-//     res.status(500).json({ success: false, message: error.message });
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
 //   }
 // };
 
-// // ✅ UPDATE attendance by attendance _id
-// export const updateAttendance = async (req, res) => {
+// // 2. UPDATE Attendance by ID
+// export const updateAttendanceById = async (req, res) => {
 //   try {
 //     const { id } = req.params;
 //     const { status } = req.body;
 
-//     const attendance = await SupervisorAttendance.findById(id);
-//     if (!attendance) {
-//       return res.status(404).json({ success: false, message: "Attendance record not found" });
+//     // Validate status
+//     if (!["Fullday", "Offday", "overtime"].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value"
+//       });
 //     }
 
-//     attendance.status = status;
-//     await attendance.save();
+//     const updatedAttendance = await SupervisorAttendance.findByIdAndUpdate(
+//       id,
+//       { status },
+//       { new: true }
+//     );
 
-//     res.status(200).json({ success: true, message: "Attendance updated successfully", attendance });
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found"
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Attendance updated successfully",
+//       attendance: {
+//         _id: updatedAttendance._id,
+//         date: formatDate(updatedAttendance.date),
+//         supervisorId: updatedAttendance.supervisorId,
+//         status: updatedAttendance.status
+//       }
+//     });
 //   } catch (error) {
-//     res.status(500).json({ success: false, message: error.message });
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
 //   }
 // };
 
-// // ✅ UPDATE attendance status by supervisorId + date
-// export const updateStatus = async (req, res) => {
+// // 3. UPDATE Status by Supervisor ID and Date
+// export const updateStatusBySupervisorAndDate = async (req, res) => {
 //   try {
 //     const { supervisorId } = req.params;
 //     const { status, date } = req.body;
 
-//     if (!date) {
-//       return res.status(400).json({ success: false, message: "Date is required" });
+//     // Validate status
+//     if (!["Fullday", "Offday", "overtime", null].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value"
+//       });
 //     }
 
-//     const attendance = await SupervisorAttendance.findOneAndUpdate(
-//       { supervisorId: parseInt(supervisorId), date },
+//     // Convert date from DD/MM/YYYY to YYYY-MM-DD for database query
+//     const [day, month, year] = date.split('/');
+//     const dbFormattedDate = `${year}-${month}-${day}`;
+
+//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+//       { 
+//         supervisorId,
+//         date: dbFormattedDate
+//       },
 //       { status },
-//       { new: true, upsert: false }
+//       { new: true }
 //     );
 
-//     if (!attendance) {
-//       return res.status(404).json({ success: false, message: "Attendance record not found" });
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found for the given supervisor and date"
+//       });
 //     }
 
-//     res.status(200).json({ success: true, message: "Status updated successfully", attendance });
+//     res.status(200).json({
+//       success: true,
+//       message: "Status updated successfully",
+//       attendance: {
+//         _id: updatedAttendance._id,
+//         date: formatDate(updatedAttendance.date),
+//         supervisorId: updatedAttendance.supervisorId,
+//         status: updatedAttendance.status
+//       }
+//     });
 //   } catch (error) {
-//     res.status(500).json({ success: false, message: error.message });
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
 //   }
 // };
 
@@ -81,19 +153,18 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-// 1. GET all attendance records
+// 1. GET all attendance records (with proper _id handling)
 export const getAllAttendance = async (req, res) => {
   try {
-    // Find all attendance records and populate supervisor details
     const attendanceRecords = await SupervisorAttendance.find({})
       .populate({
         path: 'supervisorId',
         select: '_id name email photo'
-      });
+      })
+      .lean(); // Add lean() for better performance
 
-    // Format the response data
     const formattedData = attendanceRecords.map(record => ({
-      _id: record._id,
+      _id: record._id, // This will now properly show the auto-incremented ID
       date: formatDate(record.date),
       supervisorId: {
         _id: record.supervisorId._id,
@@ -116,25 +187,34 @@ export const getAllAttendance = async (req, res) => {
   }
 };
 
-// 2. UPDATE Attendance by ID
+// 2. UPDATE Attendance by ID (with numeric ID handling)
 export const updateAttendanceById = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Validate status
-    if (!["Fullday", "Offday", "overtime", null].includes(status)) {
+    // Convert ID to number explicitly
+    const numericId = Number(id);
+    
+    if (isNaN(numericId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid ID format. Must be a number"
+      });
+    }
+
+    if (!["Fullday", "Offday", "overtime"].includes(status)) {
       return res.status(400).json({
         success: false,
         error: "Invalid status value"
       });
     }
 
-    const updatedAttendance = await SupervisorAttendance.findByIdAndUpdate(
-      id,
+    const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+      { _id: numericId },
       { status },
       { new: true }
-    );
+    ).populate('supervisorId', '_id name email photo');
 
     if (!updatedAttendance) {
       return res.status(404).json({
@@ -147,9 +227,14 @@ export const updateAttendanceById = async (req, res) => {
       success: true,
       message: "Attendance updated successfully",
       attendance: {
-        _id: updatedAttendance._id,
+        _id: updatedAttendance._id, // Will show the numeric ID
         date: formatDate(updatedAttendance.date),
-        supervisorId: updatedAttendance.supervisorId,
+        supervisorId: {
+          _id: updatedAttendance.supervisorId._id,
+          photo: updatedAttendance.supervisorId.photo,
+          name: updatedAttendance.supervisorId.name,
+          email: updatedAttendance.supervisorId.email
+        },
         status: updatedAttendance.status
       }
     });
@@ -167,7 +252,6 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     const { supervisorId } = req.params;
     const { status, date } = req.body;
 
-    // Validate status
     if (!["Fullday", "Offday", "overtime", null].includes(status)) {
       return res.status(400).json({
         success: false,
@@ -175,18 +259,17 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
       });
     }
 
-    // Convert date from DD/MM/YYYY to YYYY-MM-DD for database query
     const [day, month, year] = date.split('/');
     const dbFormattedDate = `${year}-${month}-${day}`;
 
     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
       { 
-        supervisorId,
+        supervisorId: Number(supervisorId),
         date: dbFormattedDate
       },
       { status },
       { new: true }
-    );
+    ).populate('supervisorId', '_id name email photo');
 
     if (!updatedAttendance) {
       return res.status(404).json({
@@ -199,9 +282,14 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
       success: true,
       message: "Status updated successfully",
       attendance: {
-        _id: updatedAttendance._id,
+        _id: updatedAttendance._id, // Will show the numeric ID
         date: formatDate(updatedAttendance.date),
-        supervisorId: updatedAttendance.supervisorId,
+        supervisorId: {
+          _id: updatedAttendance.supervisorId._id,
+          photo: updatedAttendance.supervisorId.photo,
+          name: updatedAttendance.supervisorId.name,
+          email: updatedAttendance.supervisorId.email
+        },
         status: updatedAttendance.status
       }
     });
