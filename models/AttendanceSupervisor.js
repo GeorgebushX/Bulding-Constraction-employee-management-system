@@ -1,75 +1,3 @@
-// import mongoose from "mongoose";
-
-// const AttendanceSupervisorSchema = new mongoose.Schema({
-//     _id: Number, // Auto-incrementing ID
-//     date: {
-//         type: String,
-//         required: true
-//     },
-//     supervisorId: {
-//         type: mongoose.Schema.Types.ObjectId,
-//         ref: "Supervisor",
-//         required: true
-//     },
-//     status: {
-//         type: String,
-//         enum: ["Fullday", "Offday","overtime"],
-//         default: null
-//     }
-// });
-
-// const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
-
-// export default SupervisorAttendance;
-
-
-
-
-
-
-
-
-
-
-
-
-// this is last update
-// models/AttendanceSupervisor.js
-
-// import mongoose from "mongoose";
-// import AutoIncrementFactory from "mongoose-sequence";
-
-// const AutoIncrement = AutoIncrementFactory(mongoose);
-
-// const AttendanceSupervisorSchema = new mongoose.Schema({
-//   _id: Number,
-//   date: {
-//     type: String,
-//     required: true,
-//   },
-//   supervisorId: {
-//     type: Number, // FIXED: Supervisor uses Number _id, not ObjectId
-//     ref: "Supervisor",
-//     required: true,
-//   },
-//   status: {
-//     type: String,
-//     enum: ["Fullday", "Offday", "overtime"],
-//     default: null,
-//   },
-// }, { _id: false });
-
-// AttendanceSupervisorSchema.plugin(AutoIncrement, {
-//   id: "attendance_seq",
-//   inc_field: "_id",
-//   start_seq: 1,
-// });
-
-// const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
-// export default SupervisorAttendance;
-
-
-
 import mongoose from "mongoose";
 import AutoIncrementFactory from "mongoose-sequence";
 
@@ -81,19 +9,15 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  // supervisorId: {
-  //   type: Number,
-  //   ref: "Supervisor",
-  //   required: true,
-  // },
   supervisorId: {
-    type: mongoose.Schema.Types.ObjectId,  // ✅ Use ObjectId
-    ref: "Supervisor",                    // ✅ Reference correct model
+    type: Number, // ✅ Match the numeric _id of Supervisor
+    ref: "Supervisor",
     required: true,
   },
+
   status: {
     type: String,
-    enum: ["Fullday", "Offday", "overtime"],
+    enum: ["Fullday", "Offday", "overtime", null],
     default: null,
   },
 }, { _id: false });
@@ -106,41 +30,3 @@ AttendanceSupervisorSchema.plugin(AutoIncrement, {
 
 const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
 export default SupervisorAttendance;
-
-
-
-
-
-// import mongoose from "mongoose";
-// import AutoIncrementFactory from "mongoose-sequence";
-
-// // Initialize auto-increment
-// const AutoIncrement = AutoIncrementFactory(mongoose);
-
-// const AttendanceSupervisorSchema = new mongoose.Schema({
-//     _id:Number,
-//     date: {
-//         type: String,
-//         required: true,
-//     },
-//     supervisorId: {
-//         type: mongoose.Schema.Types.ObjectId,
-//         ref: "Supervisor",
-//         required: true,
-//     },
-//     status: {
-//         type: String,
-//         enum: ["Fullday", "Offday", "overtime"],
-//         default: null,
-//     },
-// });
-
-// // Apply auto-increment to the `_id` field
-// AttendanceSupervisorSchema.plugin(AutoIncrement, {
-//     inc_field: "_id",  // The field to increment
-//     start_seq: 1,      // Starts counting at 1
-// });
-
-// const SupervisorAttendance = mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
-
-// export default SupervisorAttendance;
