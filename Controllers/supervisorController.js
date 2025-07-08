@@ -776,6 +776,8 @@ export const getSupervisorById = async (req, res) => {
   }
 };
 // PUT - Update supervisor by ID
+
+// PUT - Update supervisor by ID
 export const updateSupervisorById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -783,14 +785,14 @@ export const updateSupervisorById = async (req, res) => {
 
     let supervisor;
     
-    // Try as mongoose ObjectId first
-    if (/^[0-9a-fA-F]{24}$/.test(id)) {
-      supervisor = await Supervisor.findById(id);
+    // First try as numeric ID (supervisor _id)
+    if (!isNaN(id)) {
+      supervisor = await Supervisor.findOne({ _id: Number(id) });
     }
     
     // If not found, try as userId
-    if (!supervisor) {
-      supervisor = await Supervisor.findOne({ userId: id });
+    if (!supervisor && !isNaN(id)) {
+      supervisor = await Supervisor.findOne({ userId: Number(id) });
     }
 
     if (!supervisor) {
@@ -818,9 +820,10 @@ export const updateSupervisorById = async (req, res) => {
       supervisor.password = hashedPassword;
       
       // Also update user password
-      await User.findByIdAndUpdate(supervisor.userId, {
-        password: hashedPassword
-      });
+      await User.findOneAndUpdate(
+        { _id: supervisor.userId }, 
+        { password: hashedPassword }
+      );
     }
 
     // Update address
@@ -851,14 +854,11 @@ export const updateSupervisorById = async (req, res) => {
     }
     
     if (req.files?.supervisorIdProof) {
-      // Delete old ID proofs if needed
-      // (Add logic here if you want to delete old proofs when adding new ones)
-      
       const newIdProofs = req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`);
       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
     }
 
-    supervisor.updatedAt = new Date();
+    supervisor.updatedAt = new Date().toISOString();
     await supervisor.save();
     
     // Also update the associated User record
@@ -867,7 +867,10 @@ export const updateSupervisorById = async (req, res) => {
     if (updateData.email) userUpdate.email = updateData.email;
     
     if (Object.keys(userUpdate).length > 0) {
-      await User.findByIdAndUpdate(supervisor.userId, { $set: userUpdate });
+      await User.findOneAndUpdate(
+        { _id: supervisor.userId }, 
+        { $set: userUpdate }
+      );
     }
 
     return res.status(200).json({ 
@@ -884,6 +887,171 @@ export const updateSupervisorById = async (req, res) => {
   }
 };
 
+// export const updateSupervisorById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updateData = req.body;
+
+//     let supervisor;
+    
+//     // Try as mongoose ObjectId first
+//     if (/^[0-9a-fA-F]{24}$/.test(id)) {
+//       supervisor = await Supervisor.findById(id);
+//     }
+    
+//     // If not found, try as userId
+//     if (!supervisor) {
+//       supervisor = await Supervisor.findOne({ userId: id });
+//     }
+
+//     if (!supervisor) {
+//       return res.status(404).json({ 
+//         success: false, 
+//         message: "Supervisor not found" 
+//       });
+//     }
+
+//     // Update basic fields
+//     const fieldsToUpdate = [
+//       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 'address',
+//       'role', 'supervisorType', 'joiningDate', 'bankName', 'bankAccount', 'bankCode'
+//     ];
+    
+//     fieldsToUpdate.forEach(field => {
+//       if (updateData[field] !== undefined) {
+//         supervisor[field] = updateData[field];
+//       }
+//     });
+
+//     // Update password if provided
+//     if (updateData.password) {
+//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
+//       supervisor.password = hashedPassword;
+      
+//       // Also update user password
+//       await User.findByIdAndUpdate(supervisor.userId, {
+//         password: hashedPassword
+//       });
+//     }
+
+//     // Update address
+//     if (updateData.address) {
+//       try {
+//         supervisor.address = typeof updateData.address === 'string' 
+//           ? JSON.parse(updateData.address) 
+//           : updateData.address;
+//       } catch (e) {
+//         console.log("Address parsing error:", e);
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid address format. Please provide valid JSON"
+//         });
+//       }
+//     }
+
+//     // Update files if uploaded
+//     if (req.files?.photo) {
+//       // Delete old photo if exists
+//       if (supervisor.photo) {
+//         const oldPhotoPath = path.join(process.cwd(), 'public', supervisor.photo);
+//         if (fs.existsSync(oldPhotoPath)) {
+//           fs.unlinkSync(oldPhotoPath);
+//         }
+//       }
+//       supervisor.photo = `/uploads/${req.files.photo[0].filename}`;
+//     }
+    
+//     if (req.files?.supervisorIdProof) {
+//       // Delete old ID proofs if needed
+//       // (Add logic here if you want to delete old proofs when adding new ones)
+      
+//       const newIdProofs = req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`);
+//       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
+//     }
+
+//     supervisor.updatedAt = new Date();
+//     await supervisor.save();
+    
+//     // Also update the associated User record
+//     const userUpdate = {};
+//     if (updateData.name) userUpdate.name = updateData.name;
+//     if (updateData.email) userUpdate.email = updateData.email;
+    
+//     if (Object.keys(userUpdate).length > 0) {
+//       await User.findByIdAndUpdate(supervisor.userId, { $set: userUpdate });
+//     }
+
+//     return res.status(200).json({ 
+//       success: true, 
+//       message: "Supervisor updated successfully", 
+//       data: supervisor 
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
+
+// DELETE - Delete supervisor by ID
+// export const deleteSupervisorById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+    
+//     let supervisor;
+    
+//     // Try as mongoose ObjectId first
+//     if (/^[0-9a-fA-F]{24}$/.test(id)) {
+//       supervisor = await Supervisor.findByIdAndDelete(id);
+//     }
+    
+//     // If not found, try as userId
+//     if (!supervisor) {
+//       supervisor = await Supervisor.findOneAndDelete({ userId: id });
+//     }
+
+//     if (!supervisor) {
+//       return res.status(404).json({ 
+//         success: false, 
+//         message: "Supervisor not found" 
+//       });
+//     }
+
+//     // Delete associated user
+//     await User.findByIdAndDelete(supervisor.userId);
+
+//     // Delete associated files
+//     if (supervisor.photo) {
+//       const photoPath = path.join(process.cwd(), 'public', supervisor.photo);
+//       if (fs.existsSync(photoPath)) {
+//         fs.unlinkSync(photoPath);
+//       }
+//     }
+
+//     if (supervisor.supervisorIdProof && supervisor.supervisorIdProof.length > 0) {
+//       supervisor.supervisorIdProof.forEach(proof => {
+//         const proofPath = path.join(process.cwd(), 'public', proof);
+//         if (fs.existsSync(proofPath)) {
+//           fs.unlinkSync(proofPath);
+//         }
+//       });
+//     }
+
+//     return res.status(200).json({ 
+//       success: true, 
+//       message: "Supervisor deleted successfully" 
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
+
 // DELETE - Delete supervisor by ID
 export const deleteSupervisorById = async (req, res) => {
   try {
@@ -891,14 +1059,14 @@ export const deleteSupervisorById = async (req, res) => {
     
     let supervisor;
     
-    // Try as mongoose ObjectId first
-    if (/^[0-9a-fA-F]{24}$/.test(id)) {
-      supervisor = await Supervisor.findByIdAndDelete(id);
+    // First try as numeric ID (supervisor _id)
+    if (!isNaN(id)) {
+      supervisor = await Supervisor.findOneAndDelete({ _id: Number(id) });
     }
     
     // If not found, try as userId
-    if (!supervisor) {
-      supervisor = await Supervisor.findOneAndDelete({ userId: id });
+    if (!supervisor && !isNaN(id)) {
+      supervisor = await Supervisor.findOneAndDelete({ userId: Number(id) });
     }
 
     if (!supervisor) {
@@ -909,7 +1077,7 @@ export const deleteSupervisorById = async (req, res) => {
     }
 
     // Delete associated user
-    await User.findByIdAndDelete(supervisor.userId);
+    await User.findOneAndDelete({ _id: supervisor.userId });
 
     // Delete associated files
     if (supervisor.photo) {
@@ -919,7 +1087,7 @@ export const deleteSupervisorById = async (req, res) => {
       }
     }
 
-    if (supervisor.supervisorIdProof && supervisor.supervisorIdProof.length > 0) {
+    if (supervisor.supervisorIdProof?.length > 0) {
       supervisor.supervisorIdProof.forEach(proof => {
         const proofPath = path.join(process.cwd(), 'public', proof);
         if (fs.existsSync(proofPath)) {
