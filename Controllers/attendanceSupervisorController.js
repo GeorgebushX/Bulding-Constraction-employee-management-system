@@ -103,12 +103,10 @@ export const getAttendance = async (req, res) => {
 
     const data = await SupervisorAttendance.find({ date })
       .populate({
-        path: "supervisorId",
-        select: "userId name", // Include any fields you need
+        path: "supervisorId",  
         populate: {
           path: "userId",
-          model: "User",
-          select: "name email" // Include user fields you need
+          model: "User",  
         }
       });
 

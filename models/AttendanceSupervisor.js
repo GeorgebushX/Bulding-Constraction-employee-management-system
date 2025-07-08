@@ -81,14 +81,19 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // supervisorId: {
+  //   type: Number,
+  //   ref: "Supervisor",
+  //   required: true,
+  // },
   supervisorId: {
-    type: Number,
-    ref: "Supervisor",
+    type: mongoose.Schema.Types.ObjectId,  // ✅ Use ObjectId
+    ref: "Supervisor",                    // ✅ Reference correct model
     required: true,
   },
   status: {
     type: String,
-    enum: ["Fullday", "Offday", "overtime", null],
+    enum: ["Fullday", "Offday", "overtime"],
     default: null,
   },
 }, { _id: false });
