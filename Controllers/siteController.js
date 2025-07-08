@@ -67,7 +67,7 @@ export const addSite = async (req, res) => {
     await newSite.save();
 
     const populatedSite = await Site.findById(newSite._id).populate("client").lean();
-
+    
     res.status(201).json({
       success: true,
       message: "Site added successfully",

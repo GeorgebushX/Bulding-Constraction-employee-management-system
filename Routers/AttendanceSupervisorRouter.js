@@ -20,8 +20,9 @@ import {
   updateAttendance,
   updateStatus 
 } from "../Controllers/attendanceSupervisorController.js";
-import defaultAttendance from "../middleware/defaultAttendance.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import defaultAttendance from "../middleware/defaultAttendance.js";
+
 
 const router = express.Router();
 

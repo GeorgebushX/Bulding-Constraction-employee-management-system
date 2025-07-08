@@ -11,13 +11,12 @@ export const getAttendance = async (req, res) => {
   .populate({
     path: "supervisorId",
     model: "Supervisor",
-    populate: {
-      path: "userId",
-      model: "User",
-    }
+    // populate: {
+    //   path: "userId",
+    //   model: "User",
+    // }
   })
   .lean();
-
 
     res.status(200).json({ success: true, data });
   } catch (error) {

@@ -27,7 +27,7 @@ const workersCountSchema = new mongoose.Schema({
 
 // Main Site schema
 const siteSchema = new mongoose.Schema({
-  _id: Number, // Auto-incrementing numeric ID
+  _id: Number,  
   siteid: {
     type: String,
     unique: true,

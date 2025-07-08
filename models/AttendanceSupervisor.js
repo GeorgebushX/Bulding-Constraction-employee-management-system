@@ -4,7 +4,7 @@ import AutoIncrementFactory from "mongoose-sequence";
 const AutoIncrement = AutoIncrementFactory(mongoose);
 
 const AttendanceSupervisorSchema = new mongoose.Schema({
-  _id: Number,
+  _id: Number, // Auto-incrementing numeric ID
   date: {
     type: String,
     required: true,
@@ -17,7 +17,7 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ["Fullday", "Offday", "overtime", null],
+    enum: ["Fullday", "Offday", "overtime"],
     default: null,
   },
 }, { _id: false });
