@@ -1,0 +1,62 @@
+import mongoose from "mongoose";
+
+const supervisorSalarySchema = new mongoose.Schema({
+    _id: { type: Number }, // This will be manually set to supervisorId
+    supervisorId: { 
+        type: Number,
+        ref: "Supervisor",
+        required: true,
+    },
+    attendanceId: { 
+        type: Number,
+        ref: "AttendanceSupervisor",
+        required: true,
+    },
+    week: {
+        type: String,
+        required: true
+    },
+    month: {
+        type: String,
+        required: true,
+    },
+    year: {
+        type: Number,
+        required: true,
+    },
+    basicSalary: {
+        type: Number,
+        required: true,
+    },
+    allowances: {
+        type: Number,
+        default: 0,
+    },
+    deductions: {
+        type: Number,
+        default: 0,
+    },
+    netSalary: {
+        type: Number,
+        required: true,
+    },
+    status: {
+        type: String,
+        enum: ["Pending", "Paid"],
+        default: "Pending",
+    },
+    date: {
+        type: Date,
+        default: Date.now,
+    },
+}, { timestamps: true });
+
+// Set _id to be equal to supervisorId before validation
+supervisorSalarySchema.pre('validate', function(next) {
+    if (!this._id) {
+        this._id = this.supervisorId;
+    }
+    next();
+});
+
+export default mongoose.model("SupervisorSalary", supervisorSalarySchema);

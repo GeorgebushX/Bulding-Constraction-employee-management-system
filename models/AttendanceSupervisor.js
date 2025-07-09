@@ -20,12 +20,12 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
   // No need for _id: false since we've explicitly defined _id
 });
 
-// Set _id to be equal to supervisorId before validation
-AttendanceSupervisorSchema.pre('validate', function(next) {
-  if (!this._id) {
-    this._id = this.supervisorId;
-  }
-  next();
+  // Set _id to be equal to supervisorId before validation
+  AttendanceSupervisorSchema.pre('validate', function(next) {
+    if (!this._id) {
+      this._id = this.supervisorId;
+    }
+    next();
 });
 
 export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
