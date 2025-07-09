@@ -399,7 +399,7 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     if (!["Fullday", "Halfday", "Overtime"].includes(status)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid status value. Must be one of: Fullday, Halfday, overtime"
+        error: "Invalid status value. Must be one of: Fullday, Halfday, Overtime"
       });
     }
 
