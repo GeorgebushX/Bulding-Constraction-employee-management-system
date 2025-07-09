@@ -280,7 +280,7 @@ export const updateAttendanceById = async (req, res) => {
       });
     }
 
-    if (!["Fullday", "Halfday", "Overtime"].includes(status)) {
+    if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
       return res.status(400).json({
         success: false,
         error: "Invalid status value"
@@ -399,16 +399,17 @@ export const updateAttendanceById = async (req, res) => {
 // @route   PUT /api/supervisor-attendance/update-status/:supervisorId
 // @access  Private (Admin/Supervisor)
 
+
 export const updateStatusBySupervisorAndDate = async (req, res) => {
   try {
     const { supervisorId } = req.params;
     const { date, status } = req.body;
 
     // 1. Validate status
-    if (!["Fullday", "Halfday", "Overtime"].includes(status)) {
+    if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime"
+        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
       });
     }
 

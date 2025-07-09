@@ -12,7 +12,7 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Fullday", "Halfday", "Overtime"],
+    enum: ["Fullday", "Halfday", "Overtime", null],
     default: null,
   }
 }, { 
