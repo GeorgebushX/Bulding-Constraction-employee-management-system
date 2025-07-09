@@ -400,17 +400,16 @@ export const updateAttendanceById = async (req, res) => {
 // @route   PUT /api/supervisor-attendance/update-status/:supervisorId
 // @access  Private (Admin/Supervisor)
 
-
 export const updateStatusBySupervisorAndDate = async (req, res) => {
   try {
     const { supervisorId } = req.params;
-    const { date, status } = req.body;
+    const { status } = req.body; // Removed date from request body
 
     // 1. Validate status
     if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
+        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime, null"
       });
     }
 
@@ -423,45 +422,34 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
       });
     }
 
-    // 3. Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
-    const [day, month, year] = date.split('/');
-    if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid date format. Use DD/MM/YYYY."
-      });
-    }
+    // 3. Get current date in YYYY-MM-DD format
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const currentDate = `${year}-${month}-${day}`;
 
-    const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-    // 4. Update attendance record
+    // 4. Update or create attendance record
     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
       { 
-        _id: numericSupervisorId,
-        date: dbFormattedDate
+        supervisorId: numericSupervisorId, // Changed from _id to supervisorId
+        date: currentDate
       },
       { status },
       { 
-        new: true,       // Return the updated document
-        upsert: false    // Do not create if doesn't exist
+        new: true,
+        upsert: true, // Create if doesn't exist
+        setDefaultsOnInsert: true
       }
     ).populate('supervisorId', '_id name email photo');
 
-    // 5. Handle record not found
-    if (!updatedAttendance) {
-      return res.status(404).json({
-        success: false,
-        error: "Attendance record not found for the given supervisor ID and date."
-      });
-    }
-
-    // 6. Success response
+    // 5. Success response
     res.status(200).json({
       success: true,
       message: "Status updated successfully",
       data: {
         _id: updatedAttendance._id,
-        date: formatDate(updatedAttendance.date), // Format back to DD/MM/YYYY
+        date: formatDate(currentDate), // Format back to DD/MM/YYYY
         supervisor: {
           _id: updatedAttendance.supervisorId._id,
           photo: updatedAttendance.supervisorId.photo,
@@ -473,7 +461,6 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     });
 
   } catch (error) {
-    // 7. Server error handling
     console.error("Error updating attendance:", error);
     res.status(500).json({
       success: false,
@@ -481,6 +468,90 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
     });
   }
 };
+
+// export const updateStatusBySupervisorAndDate = async (req, res) => {
+//   try {
+//     const { supervisorId } = req.params;
+//     const { date, status } = req.body;
+
+//     // 1. Validate status
+//     if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
+//       });
+//     }
+
+//     // 2. Validate supervisorId (must be numeric)
+//     const numericSupervisorId = Number(supervisorId);
+//     if (isNaN(numericSupervisorId)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid supervisor ID format. Must be a number."
+//       });
+//     }
+
+//     // 3. Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
+//     const [day, month, year] = date.split('/');
+//     if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid date format. Use DD/MM/YYYY."
+//       });
+//     }
+
+//     const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+//     // 4. Update attendance record
+//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+//       { 
+//         _id: numericSupervisorId,
+//         date: dbFormattedDate
+//       },
+//       { status },
+//       { 
+//         new: true,       // Return the updated document
+//         upsert: false    // Do not create if doesn't exist
+//       }
+//     ).populate('supervisorId', '_id name email photo');
+
+//     // 5. Handle record not found
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found for the given supervisor ID and date."
+//       });
+//     }
+
+//     // 6. Success response
+//     res.status(200).json({
+//       success: true,
+//       message: "Status updated successfully",
+//       data: {
+//         _id: updatedAttendance._id,
+//         date: formatDate(updatedAttendance.date), // Format back to DD/MM/YYYY
+//         supervisor: {
+//           _id: updatedAttendance.supervisorId._id,
+//           photo: updatedAttendance.supervisorId.photo,
+//           name: updatedAttendance.supervisorId.name,
+//           email: updatedAttendance.supervisorId.email
+//         },
+//         status: updatedAttendance.status
+//       }
+//     });
+
+//   } catch (error) {
+//     // 7. Server error handling
+//     console.error("Error updating attendance:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: "Server error: " + error.message
+//     });
+//   }
+// };
+
+
+
 
 
 
