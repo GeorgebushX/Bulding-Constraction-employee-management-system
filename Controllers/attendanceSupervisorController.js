@@ -265,6 +265,7 @@ export const getAllAttendance = async (req, res) => {
   }
 };
 
+
 // 2. UPDATE Attendance by ID
 export const updateAttendanceById = async (req, res) => {
   try {

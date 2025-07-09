@@ -241,10 +241,10 @@ export const createSalary = async (req, res) => {
   try {
     const { supervisorId, attendanceId, week, month, year, allowances, deductions } = req.body;
 
-    if (!supervisorId || !month || !year) {
+    if (!month || !year) {
       return res.status(400).json({
         success: false,
-        error: "Supervisor ID, month, and year are required fields"
+        error: "month, and year are required fields"
       });
     }
 
