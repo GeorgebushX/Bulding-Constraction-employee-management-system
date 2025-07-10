@@ -144,7 +144,7 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["Pending", "Paid"],
+        enum: ["Pending", "Paid", "Partial"],
         default: "Pending",
     },
     paymentDate: {
