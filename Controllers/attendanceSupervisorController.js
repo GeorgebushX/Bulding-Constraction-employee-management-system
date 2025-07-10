@@ -1,27 +1,98 @@
 
+// import SupervisorAttendance from "../models/AttendanceSupervisor.js";
+// import Supervisor from "../models/Supervisor.js";
+// import exceljs from 'exceljs';
+// import pdfkit from 'pdfkit';
+
+// // // Helper functions for date handling
+// const getCurrentDate = () => {
+//   const today = new Date();
+//   const dbFormat = today.toISOString().split('T')[0]; // YYYY-MM-DD
+//   const [year, month, day] = dbFormat.split('-');
+//   const displayFormat = `${day}/${month}/${year}`; // DD/MM/YYYY
+//   return { dbFormat, displayFormat };
+// };
+
+// // Helper function to format date
+// const formatDate = (dateString) => {
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // 1. GET all attendance records
+// export const getAllAttendance = async (req, res) => {
+  
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//   });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 import Supervisor from "../models/Supervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
-// // Helper functions for date handling
-const getCurrentDate = () => {
-  const today = new Date();
-  const dbFormat = today.toISOString().split('T')[0]; // YYYY-MM-DD
-  const [year, month, day] = dbFormat.split('-');
-  const displayFormat = `${day}/${month}/${year}`; // DD/MM/YYYY
-  return { dbFormat, displayFormat };
-};
-
-// Helper function to format date
+// Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // If already in DD/MM/YYYY format, return as-is
+  if (dateString.includes('/')) {
+    return dateString;
+  }
+  
+  // Convert from YYYY-MM-DD to DD/MM/YYYY
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+const parseToDbDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // If already in YYYY-MM-DD format, return as-is
+  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+    return dateString;
+  }
+  
+  // Convert from DD/MM/YYYY to YYYY-MM-DD
+  const [day, month, year] = dateString.split('/');
+  return `${year}-${month}-${day}`;
+};
+
 // 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
-  
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
       .populate({
@@ -48,7 +119,7 @@ export const getAllAttendance = async (req, res) => {
     res.status(200).json({
       success: true,
       data: formattedData
-  });
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -56,6 +127,9 @@ export const getAllAttendance = async (req, res) => {
     });
   }
 };
+
+// [Rest of your controller methods remain the same, just ensure they use formatDate() and parseToDbDate() consistently]
+
 
 
 // 2. UPDATE Attendance by ID
@@ -618,167 +692,3 @@ export const getMonthlyReport = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-// // Generate PDF Report
-// const generatePDFReport = (data, periodType) => {
-//   return new Promise((resolve) => {
-//     const doc = new pdfkit();
-//     const buffers = [];
-    
-//     doc.on('data', buffers.push.bind(buffers));
-//     doc.on('end', () => {
-//       const pdfData = Buffer.concat(buffers);
-//       resolve(pdfData);
-//     });
-
-//     doc.fontSize(18).text(`Attendance ${periodType} Report`, { align: 'center' });
-//     doc.moveDown();
-//     doc.fontSize(12).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'right' });
-//     doc.moveDown();
-
-//     doc.font('Helvetica-Bold');
-//     doc.text('Date', 50, 100);
-//     doc.text('Supervisor Name', 150, 100);
-//     doc.text('Status', 300, 100);
-//     doc.font('Helvetica');
-
-//     let y = 120;
-//     data.forEach((record) => {
-//       doc.text(record.date, 50, y);
-//       doc.text(record.supervisor.name, 150, y);
-//       doc.text(record.status, 300, y);
-//       y += 20;
-//     });
-
-//     doc.end();
-//   });
-// };
-
-
-// // Generate Excel Report
-// const generateExcelReport = (data, periodType) => {
-//   const workbook = new exceljs.Workbook();
-//   const worksheet = workbook.addWorksheet('Attendance Report');
-
-//   worksheet.columns = [
-//     { header: 'Date', key: 'date', width: 15 },
-//     { header: 'Supervisor ID', key: 'id', width: 15 },
-//     { header: 'Name', key: 'name', width: 25 },
-//     { header: 'Email', key: 'email', width: 30 },
-//     { header: 'Status', key: 'status', width: 15 }
-//   ];
-
-//   data.forEach(record => {
-//     worksheet.addRow({
-//       date: record.date,
-//       id: record.supervisor._id,
-//       name: record.supervisor.name,
-//       email: record.supervisor.email,
-//       status: record.status
-//     });
-//   });
-
-//   worksheet.getRow(1).eachCell((cell) => {
-//     cell.font = { bold: true };
-//   });
-
-//   return workbook;
-// };
-
-// // 4. Attendance Report
-// export const getAttendanceReport = async (req, res) => {
-//   try {
-//     const { date, period = 'daily', format = 'json', limit = 100, skip = 0 } = req.query;
-//     const query = {};
-
-//     if (date) {
-//       if (period === 'daily') {
-//         query.date = date;
-//       } else if (period === 'weekly') {
-//         const dateObj = new Date(date);
-//         const startDate = new Date(dateObj.setDate(dateObj.getDate() - dateObj.getDay()));
-//         const endDate = new Date(dateObj.setDate(dateObj.getDate() + 6));
-        
-//         query.date = { 
-//           $gte: startDate.toISOString().split('T')[0], 
-//           $lte: endDate.toISOString().split('T')[0] 
-//         };
-//       } else if (period === 'monthly') {
-//         const [year, month] = date.split('-');
-//         query.date = {
-//           $regex: `^${year}-${month.padStart(2, '0')}`
-//         };
-//       }
-//     }
-
-//     const attendanceData = await SupervisorAttendance.find(query)
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .sort({ date: -1 })
-//       .limit(parseInt(limit))
-//       .skip(parseInt(skip));
-
-//     const formattedData = attendanceData.map(record => ({
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email,
-//         photo: record.supervisorId.photo
-//       },
-//       status: record.status || "Not Marked"
-//     }));
-
-//     const groupedData = formattedData.reduce((result, record) => {
-//       if (!result[record.date]) {
-//         result[record.date] = [];
-//       }
-//       result[record.date].push({
-//         _id: record.supervisor._id,
-//         name: record.supervisor.name,
-//         email: record.supervisor.email,
-//         photo: record.supervisor.photo,
-//         status: record.status
-//       });
-//       return result;
-//     }, {});
-
-//     if (format === 'pdf') {
-//       const pdfBuffer = await generatePDFReport(formattedData, period);
-//       res.setHeader('Content-Type', 'application/pdf');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_${period}_report.pdf`);
-//       return res.send(pdfBuffer);
-//     } else if (format === 'excel') {
-//       const workbook = generateExcelReport(formattedData, period);
-//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_${period}_report.xlsx`);
-//       await workbook.xlsx.write(res);
-//       return res.end();
-//     } else {
-//       return res.status(200).json({
-//         success: true,
-//         period,
-//         data: groupedData
-//       });
-//     }
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
