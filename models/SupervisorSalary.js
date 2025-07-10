@@ -78,6 +78,21 @@
 
 import mongoose from "mongoose";
 
+// Helper function to format dates as MM/DD/YYYY
+function formatDate(date) {
+    if (!date) return null;
+  
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
+      const day = parsedDate.getDate().toString().padStart(2, '0');
+      const year = parsedDate.getFullYear();
+      return `${davy}/${month}/${year}`;
+    }
+  
+    return date;
+  }
+
 const supervisorSalarySchema = new mongoose.Schema({
     _id: { type: Number }, // This will be manually set to supervisorId
     supervisorId: { 
@@ -96,23 +111,18 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     week: {
         type: Number,
-        required: true
     },
     month: {
         type: Number,
-        required: true,
     },
     monthName: {
         type: String,
-        required: true
     },
     year: {
-        type: Number,
-        required: true,
+        type: Number,  
     },
     basicSalary: {
-        type: Number,
-        required: true,
+        type: Number,  
     },
     allowances: {
         type: Number,
@@ -124,15 +134,12 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     netDailySalary: {
         type: Number,
-        required: true,
     },
     netWeeklySalary: {
         type: Number,
-        required: true,
     },
     netMonthlySalary: {
         type: Number,
-        required: true,
     },
     paidAmount: {
         type: Number,
@@ -140,7 +147,6 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     balanceAmount: {
         type: Number,
-        required: true
     },
     status: {
         type: String,
@@ -148,8 +154,8 @@ const supervisorSalarySchema = new mongoose.Schema({
         default: "Pending",
     },
     paymentDate: {
-        type: Date,
-        default: null
+        type: String,
+        default: () => formatDate(new Date())
     }
 }, { timestamps: true });
 
