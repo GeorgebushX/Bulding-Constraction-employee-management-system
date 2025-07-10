@@ -1,3 +1,9 @@
+import SupervisorAttendance from "../models/AttendanceSupervisor.js";
+import Supervisor from "../models/Supervisor.js";
+import exceljs from 'exceljs';
+import pdfkit from 'pdfkit';
+
+
 // Helper functions for date handling
 const getCurrentDate = () => {
   const today = new Date();
