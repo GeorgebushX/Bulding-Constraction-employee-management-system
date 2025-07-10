@@ -97,13 +97,12 @@ export const createSalary = async (req, res) => {
     // Find attendance records
     const attendanceRecords = await AttendanceSupervisor.find({
       supervisorId: supervisor._id,
-      date: date
     }).populate('supervisorId', 'name email photo');
 
     if (attendanceRecords.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `No attendance records found for ${supervisor.name} on ${date}`
+        message: `No attendance records found for ${supervisor.name}`
       });
     }
 
