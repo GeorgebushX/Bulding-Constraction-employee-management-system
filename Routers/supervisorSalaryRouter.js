@@ -49,7 +49,9 @@ import {
   getDailySalaryReport,
   getWeeklySalaryReport,
   getMonthlySalaryReport,
-  getYearlySalaryReport
+  getYearlySalaryReport,
+generateSalaryReceipt
+
 } from '../Controllers/supervisorSalaryController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 const router = express.Router();
@@ -66,7 +68,8 @@ router.get('/supervisor/reports/daily',authMiddleware, getDailySalaryReport);
 router.get('/supervisor/reports/weekly',authMiddleware, getWeeklySalaryReport);
 router.get('/supervisor/reports/monthly',authMiddleware, getMonthlySalaryReport);
 router.get('/supervisor/reports/yearly',authMiddleware, getYearlySalaryReport);
-
+// 
+router.get('supervisor/report/:id',authMiddleware, generateSalaryReceipt)
 export default router;
 
 
