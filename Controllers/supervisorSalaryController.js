@@ -64,16 +64,26 @@ export const createSalary = async (req, res) => {
       });
     }
 
+    // // Extract ID from format "Name (ID)"
+    // const idMatch = name.match(/\((\d+)\)$/);
+    // if (!idMatch) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Invalid supervisor format. Please select from the list"
+    //   });
+    // }
+
+
     // Extract ID from format "Name (ID)"
-    const idMatch = name.match(/\((\d+)\)$/);
+    const idMatch = name.match(/\s*\(\s*(\d+)\s*\)\s*$/);
     if (!idMatch) {
       return res.status(400).json({
         success: false,
-        message: "Invalid supervisor format. Please select from the list"
+        message: "Invalid supervisor format. Expected: Name(ID) or Name (ID)"
       });
     }
-
-    const supervisorId = parseInt(idMatch[1]);
+    
+    const supervisorId = idMatch[1]; // Extracted ID
 
     // Find supervisor by ID
     const supervisor = await Supervisor.findById(supervisorId);
