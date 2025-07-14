@@ -16,7 +16,7 @@ const contractorSchema = new mongoose.Schema({
   _id: Number,
   userId: { type: Number, ref: "User", required: true },
   site: { type: Number, ref: 'Site' },
-  centeringSupervisor: { type: Number, ref: "CenteringSupervisor", required: true },
+  centeringSupervisor: { type: Number, ref: "CenteringSupervisor" },
   name: { type: String, required: true },
   password: { type: String },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },

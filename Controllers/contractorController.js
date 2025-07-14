@@ -53,10 +53,10 @@ export const createContractor = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !email || !password || !site || !centeringSupervisor) {
+    if (!name || !email || !password || !site ) {
       return res.status(400).json({ 
         success: false, 
-        message: "Required fields: name, email, password, site, centeringSupervisor" 
+        message: "Required fields: name, email, password, site" 
       });
     }
 
