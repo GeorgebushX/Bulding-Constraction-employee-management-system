@@ -26,7 +26,6 @@ import {
   getSupervisorById,
   updateSupervisorById,
   deleteSupervisorById,
-  deleteAllSupervisors,  
   upload
 } from "../Controllers/supervisorController.js";
 
@@ -39,6 +38,6 @@ router.get("/supervisor",authMiddleware, getAllSupervisors);
 router.get("/supervisor/:id",authMiddleware, getSupervisorById);
 router.put("/supervisor/:id", upload,authMiddleware, updateSupervisorById);
 router.delete("/supervisor/:id",authMiddleware, deleteSupervisorById);
-router.delete("/supervisor",authMiddleware, deleteAllSupervisors);
+
 
 export default router;
