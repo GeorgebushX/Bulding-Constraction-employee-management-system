@@ -101,5 +101,5 @@ supervisorSchema.pre('save', function(next) {
   next();
 });
 
-const Supervisor = mongoose.model('Supervisor', supervisorSchema);
+const Supervisor = mongoose.model('CenteringSupervisor', supervisorSchema);
 export default Supervisor;

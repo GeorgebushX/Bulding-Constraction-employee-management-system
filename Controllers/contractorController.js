@@ -1,16 +1,20 @@
+// controllers/contractorController.js
 import Contractor from "../models/Contractor.js";
 import User from "../models/User.js";
+import Site from "../models/SiteDetails.js";
+import Supervisor from "../models/Supervisor.js";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-// Configure file upload
+// Ensure upload directory exists
 const uploadDir = path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -20,114 +24,137 @@ const storage = multer.diskStorage({
   },
 });
 
-export const upload = multer({ storage }).fields([
+export const upload = multer({ 
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|pdf/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only images (JPEG, JPG, PNG) and PDF files are allowed'));
+    }
+  }
+}).fields([
   { name: "photo", maxCount: 1 },
   { name: "contractorIdProof", maxCount: 5 },
 ]);
 
-// Helper function to get role field
-const getRoleField = (contractorRole) => {
-  const roleMap = {
-    'Centering Contractor': 'centering',
-    'Steel Contractor': 'steel',
-    'Mason Contractor': 'mason',
-    'Carpenter Contractor': 'carpenter',
-    'Plumber Contractor': 'plumber',
-    'Electrician Contractor': 'electrician',
-    'Painter Contractor': 'painter',
-    'Tiles Contractor': 'tiles'
-  };
-  return roleMap[contractorRole];
-};
-
-// Create Contractor
-export const addContractor = async (req, res) => {
+// POST - Create a new Centering Contractor
+export const createContractor = async (req, res) => {
   try {
     const {
       name, email, gender, phone, alternatePhone, address,
-      contractorRole, joiningDate, bankAccount, bankCode, 
-      password, workerType
+      joiningDate, bankName, bankAccount, bankCode, password, 
+      site, centeringSupervisor
     } = req.body;
 
     // Validate required fields
-    if (!name || !email || !phone || !password || !contractorRole) {
+    if (!name || !email || !password || !site || !centeringSupervisor) {
       return res.status(400).json({ 
         success: false, 
-        message: "Required fields: name, email, phone, password, contractorRole" 
+        message: "Required fields: name, email, password, site, centeringSupervisor" 
       });
     }
 
-    // Check if email exists
+    // Validate site exists
+    const siteExists = await Site.findById(site);
+    if (!siteExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Site not found"
+      });
+    }
+
+    // Validate centering supervisor exists
+    const supervisorExists = await Supervisor.findById(centeringSupervisor);
+    if (!supervisorExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Centering Supervisor not found"
+      });
+    }
+
+    // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ 
         success: false, 
-        message: "Email already registered" 
+        message: "User already registered with this email" 
       });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create User first
+    // Create and save new User
     const newUser = new User({ 
       name, 
       email, 
       password: hashedPassword, 
-      role: "Contractor" 
+      role: "Contractor"
     });
     await newUser.save();
 
-    // Process files
+    // Process uploaded files
     const photo = req.files?.photo ? `/uploads/${req.files.photo[0].filename}` : null;
     const contractorIdProof = req.files?.contractorIdProof 
       ? req.files.contractorIdProof.map(file => `/uploads/${file.filename}`) 
       : [];
 
-    // Parse address if string
+    // Parse address if it's a string
     let parsedAddress = address;
     try {
       if (typeof address === 'string') parsedAddress = JSON.parse(address);
     } catch (e) {
       console.log("Address parsing error:", e);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid address format. Please provide valid JSON for address"
+      });
     }
 
-    // Prepare roleDetails
-    const roleField = getRoleField(contractorRole);
-    const roleDetails = {};
-    roleDetails[roleField] = {
-      workerType: workerType || null,
-      workers: []
-    };
-
-    // Create Contractor
+    // Create and save new Contractor record
     const newContractor = new Contractor({
       userId: newUser._id,
       name,
-      email,
+      password: hashedPassword,
       gender,
+      email,
       phone,
       alternatePhone,
       address: parsedAddress,
-      contractorRole,
+      role: "Contractor",
+      contractorRole: "Centering Contractor", // Fixed type
       joiningDate,
+      bankName,
       bankAccount,
       bankCode,
       contractorIdProof,
       photo,
-      password: hashedPassword,
-      roleDetails
+      site,
+      centeringSupervisor
     });
 
     await newContractor.save();
-    
-    return res.status(201).json({ 
-      success: true, 
-      message: "Contractor added successfully", 
-      data: newContractor 
+
+    // Populate site and supervisor details in the response
+    const populatedContractor = await Contractor.findById(newContractor._id)
+      .populate('site')
+      .populate('centeringSupervisor')
+      .lean();
+
+    res.status(201).json({
+      success: true,
+      message: "Centering Contractor created successfully",
+      data: populatedContractor
     });
+
   } catch (error) {
-    console.error("Error adding contractor:", error);
+    console.error("Error creating contractor:", error);
     res.status(500).json({ 
       success: false, 
       message: "Server error", 
@@ -136,63 +163,93 @@ export const addContractor = async (req, res) => {
   }
 };
 
-// Get All Contractors
-export const getContractors = async (req, res) => {
+// GET - Get all Centering Contractors with site and supervisor details
+export const getAllContractors = async (req, res) => {
   try {
-    const { contractorRole } = req.query;
-    const filter = {};
+    const { search = '', site, supervisor } = req.query;
+
+    const query = { 
+      role: "Contractor",
+      contractorRole: "Centering Contractor" // Fixed type
+    };
     
-    if (contractorRole) {
-      filter.contractorRole = contractorRole;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (site) {
+      query.site = site;
+    }
+    
+    if (supervisor) {
+      query.centeringSupervisor = supervisor;
     }
 
-    const contractors = await Contractor.find(filter)
-      .populate("userId", "-password")
+    const contractors = await Contractor.find(query)
+      .populate('site')
+      .populate('centeringSupervisor')
       .lean();
 
-    return res.status(200).json({ 
+    res.status(200).json({ 
       success: true, 
-      data: contractors 
+      data: contractors
     });
   } catch (error) {
-    return res.status(500).json({ 
+    res.status(500).json({ 
       success: false, 
-      message: "Internal Server Error", 
+      message: "Server Error", 
       error: error.message 
     });
   }
 };
 
-// Get Contractor by ID
+// GET - Get Centering Contractor by ID with full details
 export const getContractorById = async (req, res) => {
   const { id } = req.params;
   try {
     let contractor;
+
+    // First try as numeric ID
     if (!isNaN(id)) {
-      contractor = await Contractor.findOne({ _id: parseInt(id) })
-        .populate("userId", "-password")
+      contractor = await Contractor.findOne({ 
+        _id: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      })
+        .populate('site')
+        .populate('centeringSupervisor')
         .lean();
     }
-
-    if (!contractor) {
-      contractor = await Contractor.findOne({ userId: parseInt(id) })
-        .populate("userId", "-password")
+    
+    // If not found, try as userId
+    if (!contractor && !isNaN(id)) {
+      contractor = await Contractor.findOne({ 
+        userId: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      })
+        .populate('site')
+        .populate('centeringSupervisor')
         .lean();
     }
 
     if (!contractor) {
       return res.status(404).json({ 
         success: false, 
-        message: "Contractor not found" 
+        message: "Centering Contractor not found" 
       });
     }
 
-    return res.status(200).json({ 
+    res.status(200).json({ 
       success: true, 
-      data: contractor 
+      data: contractor
     });
   } catch (error) {
-    return res.status(500).json({ 
+    res.status(500).json({ 
       success: false, 
       message: "Server error", 
       error: error.message 
@@ -200,31 +257,67 @@ export const getContractorById = async (req, res) => {
   }
 };
 
-// Update Contractor
-export const updateContractor = async (req, res) => {
+// PUT - Update Centering Contractor by ID
+export const updateContractorById = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
 
     let contractor;
+    
+    // First try as numeric ID (contractor _id)
     if (!isNaN(id)) {
-      contractor = await Contractor.findOne({ _id: parseInt(id) });
-      if (!contractor) {
-        contractor = await Contractor.findOne({ userId: parseInt(id) });
-      }
+      contractor = await Contractor.findOne({ 
+        _id: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      });
+    }
+    
+    // If not found, try as userId
+    if (!contractor && !isNaN(id)) {
+      contractor = await Contractor.findOne({ 
+        userId: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      });
     }
 
     if (!contractor) {
       return res.status(404).json({ 
         success: false, 
-        message: "Contractor not found" 
+        message: "Centering Contractor not found" 
       });
     }
 
-    // Update basic fields
+    // Validate site if being updated
+    if (updateData.site) {
+      const siteExists = await Site.findById(updateData.site);
+      if (!siteExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Site not found"
+        });
+      }
+      contractor.site = updateData.site;
+    }
+
+    // Validate supervisor if being updated
+    if (updateData.centeringSupervisor) {
+      const supervisorExists = await Supervisor.findById(updateData.centeringSupervisor);
+      if (!supervisorExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Centering Supervisor not found"
+        });
+      }
+      contractor.centeringSupervisor = updateData.centeringSupervisor;
+    }
+
+    // Update other fields
     const fieldsToUpdate = [
-      'name', 'email', 'gender', 'phone', 'alternatePhone', 
-      'contractorRole', 'joiningDate', 'bankAccount', 'bankCode'
+      'name', 'email', 'gender', 'phone', 'alternatePhone', 'address',
+      'joiningDate', 'bankName', 'bankAccount', 'bankCode'
     ];
     
     fieldsToUpdate.forEach(field => {
@@ -233,19 +326,24 @@ export const updateContractor = async (req, res) => {
       }
     });
 
-    // Update address
-    if (updateData.address) {
-      try {
-        contractor.address = typeof updateData.address === 'string' 
-          ? JSON.parse(updateData.address) 
-          : updateData.address;
-      } catch (e) {
-        console.log("Address parsing error:", e);
-      }
+    // Update password if provided
+    if (updateData.password) {
+      const hashedPassword = await bcrypt.hash(updateData.password, 10);
+      contractor.password = hashedPassword;
+      await User.findOneAndUpdate(
+        { _id: contractor.userId }, 
+        { password: hashedPassword }
+      );
     }
 
-    // Update files
+    // Update files if uploaded
     if (req.files?.photo) {
+      if (contractor.photo) {
+        const oldPhotoPath = path.join(process.cwd(), 'public', contractor.photo);
+        if (fs.existsSync(oldPhotoPath)) {
+          fs.unlinkSync(oldPhotoPath);
+        }
+      }
       contractor.photo = `/uploads/${req.files.photo[0].filename}`;
     }
     
@@ -254,54 +352,34 @@ export const updateContractor = async (req, res) => {
       contractor.contractorIdProof = [...contractor.contractorIdProof, ...newIdProofs];
     }
 
-    // Update password
-    if (updateData.password) {
-      const hashedPassword = await bcrypt.hash(updateData.password, 10);
-      contractor.password = hashedPassword;
-      await User.findOneAndUpdate(
-        { _id: contractor.userId },
-        { $set: { password: hashedPassword } }
-      );
-    }
-
-    // Update role details if contractorRole changed
-    if (updateData.contractorRole) {
-      const roleField = getRoleField(updateData.contractorRole);
-      contractor.roleDetails = {
-        [roleField]: {
-          workerType: updateData.workerType || null,
-          workers: contractor.roleDetails?.[roleField]?.workers || []
-        }
-      };
-    } else if (updateData.workerType) {
-      const roleField = getRoleField(contractor.contractorRole);
-      if (contractor.roleDetails[roleField]) {
-        contractor.roleDetails[roleField].workerType = updateData.workerType;
-      }
-    }
-
+    contractor.updatedAt = new Date().toISOString();
     await contractor.save();
     
-    // Update User record
-    if (updateData.name || updateData.email) {
+    // Update the associated User record
+    const userUpdate = {};
+    if (updateData.name) userUpdate.name = updateData.name;
+    if (updateData.email) userUpdate.email = updateData.email;
+    
+    if (Object.keys(userUpdate).length > 0) {
       await User.findOneAndUpdate(
-        { _id: contractor.userId },
-        {
-          $set: {
-            ...(updateData.name && { name: updateData.name }),
-            ...(updateData.email && { email: updateData.email })
-          }
-        }
+        { _id: contractor.userId }, 
+        { $set: userUpdate }
       );
     }
 
-    return res.status(200).json({ 
+    // Get updated contractor with populated details
+    const updatedContractor = await Contractor.findById(contractor._id)
+      .populate('site')
+      .populate('centeringSupervisor')
+      .lean();
+
+    res.status(200).json({ 
       success: true, 
-      message: "Contractor updated successfully", 
-      data: contractor 
+      message: "Centering Contractor updated successfully", 
+      data: updatedContractor 
     });
   } catch (error) {
-    return res.status(500).json({ 
+    res.status(500).json({ 
       success: false, 
       message: "Server error", 
       error: error.message 
@@ -309,30 +387,42 @@ export const updateContractor = async (req, res) => {
   }
 };
 
-// Delete Contractor by ID
-export const deleteContractor = async (req, res) => {
+// DELETE - Delete Centering Contractor by ID
+export const deleteContractorById = async (req, res) => {
   try {
     const { id } = req.params;
     
     let contractor;
+    
+    // First try as numeric ID (contractor _id)
     if (!isNaN(id)) {
-      contractor = await Contractor.findOneAndDelete({ _id: parseInt(id) });
-      if (!contractor) {
-        contractor = await Contractor.findOneAndDelete({ userId: parseInt(id) });
-      }
+      contractor = await Contractor.findOneAndDelete({ 
+        _id: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      });
+    }
+    
+    // If not found, try as userId
+    if (!contractor && !isNaN(id)) {
+      contractor = await Contractor.findOneAndDelete({ 
+        userId: Number(id), 
+        role: "Contractor",
+        contractorRole: "Centering Contractor"
+      });
     }
 
     if (!contractor) {
       return res.status(404).json({ 
         success: false, 
-        message: "Contractor not found" 
+        message: "Centering Contractor not found" 
       });
     }
 
     // Delete associated user
     await User.findOneAndDelete({ _id: contractor.userId });
 
-    // Clean up files
+    // Delete associated files
     if (contractor.photo) {
       const photoPath = path.join(process.cwd(), 'public', contractor.photo);
       if (fs.existsSync(photoPath)) {
@@ -349,12 +439,12 @@ export const deleteContractor = async (req, res) => {
       });
     }
 
-    return res.status(200).json({ 
+    res.status(200).json({ 
       success: true, 
-      message: "Contractor deleted successfully" 
+      message: "Centering Contractor deleted successfully" 
     });
   } catch (error) {
-    return res.status(500).json({ 
+    res.status(500).json({ 
       success: false, 
       message: "Server error", 
       error: error.message 
@@ -362,2044 +452,58 @@ export const deleteContractor = async (req, res) => {
   }
 };
 
-// Delete All Contractors
+// DELETE - Delete all Centering Contractors (for development only)
 export const deleteAllContractors = async (req, res) => {
   try {
-    // Delete all contractors
-    const result = await Contractor.deleteMany({});
-    
-    // Delete all associated users with role "Contractor"
-    await User.deleteMany({ role: "Contractor" });
+    // Only allow in development environment
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({
+        success: false,
+        message: "This operation is only allowed in development environment"
+      });
+    }
 
-    return res.status(200).json({ 
-      success: true, 
-      message: `Deleted ${result.deletedCount} contractors successfully`,
-      deletedCount: result.deletedCount
+    const contractors = await Contractor.find({ 
+      role: "Contractor",
+      contractorRole: "Centering Contractor"
+    });
+
+    // Delete all associated users and files
+    for (const contractor of contractors) {
+      await User.findOneAndDelete({ _id: contractor.userId });
+
+      if (contractor.photo) {
+        const photoPath = path.join(process.cwd(), 'public', contractor.photo);
+        if (fs.existsSync(photoPath)) {
+          fs.unlinkSync(photoPath);
+        }
+      }
+
+      if (contractor.contractorIdProof?.length > 0) {
+        contractor.contractorIdProof.forEach(proof => {
+          const proofPath = path.join(process.cwd(), 'public', proof);
+          if (fs.existsSync(proofPath)) {
+            fs.unlinkSync(proofPath);
+          }
+        });
+      }
+    }
+
+    // Delete all contractors
+    const result = await Contractor.deleteMany({ 
+      role: "Contractor",
+      contractorRole: "Centering Contractor"
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${result.deletedCount} Centering Contractors successfully`
     });
   } catch (error) {
-    return res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
     });
   }
 };
-
-
-
-
-
-
-
-
-// // // ✅ Remove ID Proof
-// // export const removeIdProof = async (req, res) => {
-// //   try {
-// //     const { id, proofUrl } = req.params;
-
-// //     // Find contractor by _id or userId
-// //     let contractor;
-// //     if (!isNaN(id)) {
-// //       contractor = await Contractor.findOne({ _id: parseInt(id) });
-// //       if (!contractor) {
-// //         contractor = await Contractor.findOne({ userId: parseInt(id) });
-// //       }
-// //     }
-
-// //     if (!contractor) {
-// //       return res.status(404).json({ 
-// //         success: false, 
-// //         message: "Contractor not found" 
-// //       });
-// //     }
-
-// //     // Remove the file from server
-// //     const proofPath = path.join(process.cwd(), 'public', proofUrl);
-// //     if (fs.existsSync(proofPath)) {
-// //       fs.unlinkSync(proofPath);
-// //     }
-
-// //     // Filter out the proof to be removed
-// //     contractor.contractorIdProof = contractor.contractorIdProof.filter(
-// //       proof => proof !== proofUrl
-// //     );
-
-// //     await contractor.save();
-
-// //     return res.status(200).json({ 
-// //       success: true, 
-// //       message: "ID proof removed successfully",
-// //       data: contractor.contractorIdProof
-// //     });
-// //   } catch (error) {
-// //     return res.status(500).json({ 
-// //       success: false, 
-// //       message: "Server error", 
-// //       error: error.message 
-// //     });
-// //   }
-// // };
-
-// // // ✅ Get Contractors by Role
-// // export const getContractorsByRole = async (req, res) => {
-// //   try {
-// //     const { role } = req.params;
-    
-// //     if (![
-// //       'Centering Contractor', 
-// //       'Steel Contractor', 
-// //       'Mason Contractor', 
-// //       'Carpenter Contractor', 
-// //       'Plumber Contractor', 
-// //       'Electrician Contractor', 
-// //       'Painter Contractor', 
-// //       'Tiles Contractor'
-// //     ].includes(role)) {
-// //       return res.status(400).json({
-// //         success: false,
-// //         message: "Invalid contractor role"
-// //       });
-// //     }
-
-// //     const contractors = await Contractor.find({ contractorRole: role })
-// //       .populate("userId", "-password")
-// //       .lean();
-
-// //     return res.status(200).json({
-// //       success: true,
-// //       data: contractors
-// //     });
-// //   } catch (error) {
-// //     return res.status(500).json({
-// //       success: false,
-// //       message: "Server error",
-// //       error: error.message
-// //     });
-// //   }
-// // };
-
-
-
-// import Contractor from "../models/Contractor.js";
-// import User from "../models/User.js";
-// import bcrypt from "bcrypt";
-// import multer from "multer";
-// import path from "path";
-// import fs from "fs";
-
-// // Ensure upload directory exists
-// const uploadDir = path.join(process.cwd(), "public", "uploads");
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
-
-// // Multer storage configuration
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, uploadDir);
-//   },
-//   filename: (req, file, cb) => {
-//     cb(null, Date.now() + path.extname(file.originalname));
-//   },
-// });
-
-// // Configure multer for file uploads
-// export const upload = multer({ storage }).fields([
-//   { name: "photo", maxCount: 1 },
-//   { name: "contractorIdProof", maxCount: 5 },
-// ]);
-
-// // ✅ Add Contractor Function
-// export const addContractor = async (req, res) => {
-//   try {
-//     const {
-//       name, email, gender, phone, alternatePhone, address, contractorRole, joiningDate, bankAccount,
-//       bankCode, password, roleDetails
-//     } = req.body;
-
-//     // Validate required fields
-//     if (!name || !email || !phone || !password || !contractorRole) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Required fields: name, email, phone, password, contractorRole" 
-//       });
-//     }
-
-//     // Check if email already exists
-//     const existingUser = await User.findOne({ email });
-//     if (existingUser) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "User already registered with this email" 
-//       });
-//     }
-
-//     // Hash password
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Create and save new User first to get the userId
-//     const newUser = new User({ 
-//       name, 
-//       email, 
-//       password: hashedPassword, 
-//       role: "Contractor" 
-//     });
-//     await newUser.save();
-
-//     // Process uploaded files
-//     const photo = req.files?.photo ? `/uploads/${req.files.photo[0].filename}` : null;
-//     const contractorIdProof = req.files?.contractorIdProof 
-//       ? req.files.contractorIdProof.map(file => `/uploads/${file.filename}`) 
-//       : [];
-
-//     // Parse address objects if they're strings
-//     let parsedAddress = address;
-//     let parsedPermanentAddress = permanentAddress;
-//     let parsedRoleDetails = roleDetails;
-    
-//     try {
-//       if (typeof address === 'string') parsedAddress = JSON.parse(address);
-//       if (typeof permanentAddress === 'string') parsedPermanentAddress = JSON.parse(permanentAddress);
-//       if (typeof roleDetails === 'string') parsedRoleDetails = JSON.parse(roleDetails);
-//     } catch (e) {
-//       console.log("Parsing error:", e);
-//     }
-
-//     // Create and save new Contractor record
-//     const newContractor = new Contractor({
-//       userId: newUser._id,
-//       name,
-//       email,
-//       gender,
-//       phone,
-//       alternatePhone,
-//       address: parsedAddress,
-//       role: "Contractor",
-//       contractorRole,
-//       joiningDate,
-//       roleDetails: parsedRoleDetails || {},
-//       bankAccount,
-//       bankCode,
-//       contractorIdProof,
-//       photo,
-//       password: hashedPassword
-//     });
-
-//     await newContractor.save();
-    
-//     return res.status(201).json({ 
-//       success: true, 
-//       message: "Contractor added successfully", 
-//       data: newContractor 
-//     });
-//   } catch (error) {
-//     console.error("Error adding contractor:", error);
-//     res.status(500).json({ 
-//       success: false, 
-//       message: "Server error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Get All Contractors
-// export const getContractors = async (req, res) => {
-//   try {
-//     const { contractorRole } = req.query;
-//     const filter = {};
-    
-//     if (contractorRole) {
-//       filter.contractorRole = contractorRole;
-//     }
-
-//     const contractors = await Contractor.find(filter)
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone")
-//       .populate("roleDetails.steel.workers", "name phone")
-//       .populate("roleDetails.mason.workers", "name phone")
-//       .populate("roleDetails.carpenter.workers", "name phone")
-//       .populate("roleDetails.plumber.workers", "name phone")
-//       .populate("roleDetails.electrician.workers", "name phone")
-//       .populate("roleDetails.painter.workers", "name phone")
-//       .populate("roleDetails.tiles.workers", "name phone")
-//       .lean();
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractors 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Internal Server Error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Get One Contractor (by ID)
-// export const getContractorById = async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     // First try to find by _id (number)
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOne({ _id: parseInt(id) })
-//         .populate("userId", "-password")
-//         .populate("roleDetails.centering.workers", "name phone workerType")
-//         .populate("roleDetails.steel.workers", "name phone workerType")
-//         .populate("roleDetails.mason.workers", "name phone workerType")
-//         .populate("roleDetails.carpenter.workers", "name phone workerType")
-//         .populate("roleDetails.plumber.workers", "name phone workerType")
-//         .populate("roleDetails.electrician.workers", "name phone workerType")
-//         .populate("roleDetails.painter.workers", "name phone workerType")
-//         .populate("roleDetails.tiles.workers", "name phone workerType")
-//         .lean();
-//     }
-
-//     // If not found by _id, try by userId (number)
-//     if (!contractor) {
-//       contractor = await Contractor.findOne({ userId: parseInt(id) })
-//         .populate("userId", "-password")
-//         .populate("roleDetails.centering.workers", "name phone workerType")
-//         .populate("roleDetails.steel.workers", "name phone workerType")
-//         .populate("roleDetails.mason.workers", "name phone workerType")
-//         .populate("roleDetails.carpenter.workers", "name phone workerType")
-//         .populate("roleDetails.plumber.workers", "name phone workerType")
-//         .populate("roleDetails.electrician.workers", "name phone workerType")
-//         .populate("roleDetails.painter.workers", "name phone workerType")
-//         .populate("roleDetails.tiles.workers", "name phone workerType")
-//         .lean();
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found" 
-//       });
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractor 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Server error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Update Contractor
-// export const updateContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const updateData = req.body;
-
-//     // Find contractor by _id or userId
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOne({ _id: parseInt(id) });
-//       if (!contractor) {
-//         contractor = await Contractor.findOne({ userId: parseInt(id) });
-//       }
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found" 
-//       });
-//     }
-
-//     // Update basic fields
-//     const fieldsToUpdate = [
-//       'name', 'email', 'gender', 'phone', 'alternatePhone', 
-//       'contractorRole', 'joiningDate', 'bankAccount', 'bankCode', 'roleDetails'
-//     ];
-    
-//     fieldsToUpdate.forEach(field => {
-//       if (updateData[field] !== undefined) {
-//         // Special handling for roleDetails
-//         if (field === 'roleDetails') {
-//           try {
-//             contractor[field] = typeof updateData[field] === 'string' 
-//               ? JSON.parse(updateData[field]) 
-//               : updateData[field];
-//           } catch (e) {
-//             console.log("RoleDetails parsing error:", e);
-//           }
-//         } else {
-//           contractor[field] = updateData[field];
-//         }
-//       }
-//     });
-
-//     // Update address objects
-//     if (updateData.address) {
-//       try {
-//         contractor.address = typeof updateData.address === 'string' 
-//           ? JSON.parse(updateData.address) 
-//           : updateData.address;
-//       } catch (e) {
-//         console.log("Address parsing error:", e);
-//       }
-//     }
-
-//     if (updateData.permanentAddress) {
-//       try {
-//         contractor.permanentAddress = typeof updateData.permanentAddress === 'string' 
-//           ? JSON.parse(updateData.permanentAddress) 
-//           : updateData.permanentAddress;
-//       } catch (e) {
-//         console.log("Permanent address parsing error:", e);
-//       }
-//     }
-
-//     // Update files if uploaded
-//     if (req.files?.photo) {
-//       // Delete old photo if exists
-//       if (contractor.photo) {
-//         const oldPhotoPath = path.join(process.cwd(), 'public', contractor.photo);
-//         if (fs.existsSync(oldPhotoPath)) {
-//           fs.unlinkSync(oldPhotoPath);
-//         }
-//       }
-//       contractor.photo = `/uploads/${req.files.photo[0].filename}`;
-//     }
-    
-//     if (req.files?.contractorIdProof) {
-//       const newIdProofs = req.files.contractorIdProof.map(file => `/uploads/${file.filename}`);
-//       contractor.contractorIdProof = [...contractor.contractorIdProof, ...newIdProofs];
-//     }
-
-//     // Handle password update
-//     if (updateData.password) {
-//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
-//       contractor.password = hashedPassword;
-      
-//       // Also update user password
-//       await User.findOneAndUpdate(
-//         { _id: contractor.userId },
-//         { $set: { password: hashedPassword } }
-//       );
-//     }
-
-//     await contractor.save();
-    
-//     // Also update the associated User record
-//     if (updateData.name || updateData.email) {
-//       await User.findOneAndUpdate(
-//         { _id: contractor.userId },
-//         {
-//           $set: {
-//             ...(updateData.name && { name: updateData.name }),
-//             ...(updateData.email && { email: updateData.email })
-//           }
-//         }
-//       );
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor updated successfully", 
-//       data: contractor 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Server error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Delete Contractor
-// export const deleteContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-    
-//     // Find contractor by _id or userId
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOneAndDelete({ _id: parseInt(id) });
-//       if (!contractor) {
-//         contractor = await Contractor.findOneAndDelete({ userId: parseInt(id) });
-//       }
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found" 
-//       });
-//     }
-
-//     // Delete associated user
-//     await User.findOneAndDelete({ _id: contractor.userId });
-
-//     // Clean up uploaded files
-//     if (contractor.photo) {
-//       const photoPath = path.join(process.cwd(), 'public', contractor.photo);
-//       if (fs.existsSync(photoPath)) {
-//         fs.unlinkSync(photoPath);
-//       }
-//     }
-
-//     if (contractor.contractorIdProof && contractor.contractorIdProof.length > 0) {
-//       contractor.contractorIdProof.forEach(proof => {
-//         const proofPath = path.join(process.cwd(), 'public', proof);
-//         if (fs.existsSync(proofPath)) {
-//           fs.unlinkSync(proofPath);
-//         }
-//       });
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor deleted successfully" 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Server error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Remove ID Proof
-// export const removeIdProof = async (req, res) => {
-//   try {
-//     const { id, proofUrl } = req.params;
-
-//     // Find contractor by _id or userId
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOne({ _id: parseInt(id) });
-//       if (!contractor) {
-//         contractor = await Contractor.findOne({ userId: parseInt(id) });
-//       }
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found" 
-//       });
-//     }
-
-//     // Remove the file from server
-//     const proofPath = path.join(process.cwd(), 'public', proofUrl);
-//     if (fs.existsSync(proofPath)) {
-//       fs.unlinkSync(proofPath);
-//     }
-
-//     // Filter out the proof to be removed
-//     contractor.contractorIdProof = contractor.contractorIdProof.filter(
-//       proof => proof !== proofUrl
-//     );
-
-//     await contractor.save();
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "ID proof removed successfully",
-//       data: contractor.contractorIdProof
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Server error", 
-//       error: error.message 
-//     });
-//   }
-// };
-
-// // ✅ Get Contractors by Role
-// export const getContractorsByRole = async (req, res) => {
-//   try {
-//     const { role } = req.params;
-    
-//     if (![
-//       'Centering Contractor', 
-//       'Steel Contractor', 
-//       'Mason Contractor', 
-//       'Carpenter Contractor', 
-//       'Plumber Contractor', 
-//       'Electrician Contractor', 
-//       'Painter Contractor', 
-//       'Tiles Contractor'
-//     ].includes(role)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role"
-//       });
-//     }
-
-//     const contractors = await Contractor.find({ contractorRole: role })
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone")
-//       .populate("roleDetails.steel.workers", "name phone")
-//       .populate("roleDetails.mason.workers", "name phone")
-//       .populate("roleDetails.carpenter.workers", "name phone")
-//       .populate("roleDetails.plumber.workers", "name phone")
-//       .populate("roleDetails.electrician.workers", "name phone")
-//       .populate("roleDetails.painter.workers", "name phone")
-//       .populate("roleDetails.tiles.workers", "name phone")
-//       .lean();
-
-//     return res.status(200).json({
-//       success: true,
-//       data: contractors
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//       error: error.message
-//     });
-//   }
-// };
-
-// // ✅ Add Worker to Contractor
-// export const addWorkerToContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-
-//     // Find contractor
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: parseInt(contractorId) },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found"
-//       });
-//     }
-
-//     // Determine which roleDetails field to update based on contractorRole
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role"
-//       });
-//     }
-
-//     // Add worker to the appropriate roleDetails
-//     if (!contractor.roleDetails[roleField].workers.includes(workerId)) {
-//       contractor.roleDetails[roleField].workers.push(workerId);
-//       await contractor.save();
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker added to contractor successfully",
-//       data: contractor
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//       error: error.message
-//     });
-//   }
-// };
-
-// // ✅ Remove Worker from Contractor
-// export const removeWorkerFromContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-
-//     // Find contractor
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: parseInt(contractorId) },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found"
-//       });
-//     }
-
-//     // Determine which roleDetails field to update based on contractorRole
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role"
-//       });
-//     }
-
-//     // Remove worker from the appropriate roleDetails
-//     contractor.roleDetails[roleField].workers = 
-//       contractor.roleDetails[roleField].workers.filter(id => id.toString() !== workerId);
-    
-//     await contractor.save();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker removed from contractor successfully",
-//       data: contractor
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import Contractor from "../models/Contractor.js";
-// import User from "../models/User.js";
-// import Worker from "../models/Workers.js";
-// import bcrypt from "bcrypt";
-// import multer from "multer";
-// import path from "path";
-// import fs from "fs";
-
-// // Configure upload directory
-// const uploadDir = path.join(process.cwd(), "public", "uploads");
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
-
-// // Multer configuration
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, uploadDir),
-//   filename: (req, file, cb) => cb(null, `${Date.now()}${path.extname(file.originalname)}`),
-// });
-
-// export const upload = multer({ 
-//   storage,
-//   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-// }).fields([
-//   { name: "photo", maxCount: 1 },
-//   { name: "contractorIdProof", maxCount: 5 },
-// ]);
-
-// // Helper function to clean up uploaded files on error
-// const cleanUpFiles = (files) => {
-//   if (files?.photo?.[0]) {
-//     fs.unlinkSync(path.join(uploadDir, files.photo[0].filename));
-//   }
-//   if (files?.contractorIdProof) {
-//     files.contractorIdProof.forEach(file => {
-//       fs.unlinkSync(path.join(uploadDir, file.filename));
-//     });
-//   }
-// };
-
-// // Add Contractor
-// export const addContractor = async (req, res) => {
-//   try {
-//     const { name, email, phone, password, contractorRole, ...rest } = req.body;
-
-//     // Validate required fields
-//     if (!name || !email || !phone || !password || !contractorRole) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Required fields: name, email, phone, password, contractorRole",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Check if email exists
-//     const existingUser = await User.findOne({ email });
-//     if (existingUser) {
-//       return res.status(409).json({ 
-//         success: false, 
-//         message: "Email already registered",
-//         errorType: "DUPLICATE_ENTRY"
-//       });
-//     }
-
-//     // Hash password
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Create User
-//     const newUser = new User({ 
-//       name, 
-//       email, 
-//       password: hashedPassword, 
-//       role: "Contractor",
-//       phone
-//     });
-//     await newUser.save();
-
-//     // Process files
-//     const photo = req.files?.photo?.[0]?.filename ? `/uploads/${req.files.photo[0].filename}` : null;
-//     const contractorIdProof = req.files?.contractorIdProof?.map(file => `/uploads/${file.filename}`) || [];
-
-//     // Parse address if it's a string
-//     let parsedAddress = rest.address;
-//     try {
-//       if (typeof rest.address === 'string') parsedAddress = JSON.parse(rest.address);
-//     } catch (e) {
-//       console.log("Address parsing error:", e);
-//       cleanUpFiles(req.files);
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Invalid address format",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Create Contractor
-//     const newContractor = new Contractor({
-//       userId: newUser._id,
-//       name,
-//       email,
-//       phone,
-//       password: hashedPassword,
-//       contractorRole,
-//       address: parsedAddress,
-//       gender: rest.gender,
-//       alternatePhone: rest.alternatePhone,
-//       joiningDate: rest.joiningDate,
-//       bankAccount: rest.bankAccount,
-//       bankCode: rest.bankCode,
-//       photo,
-//       contractorIdProof
-//     });
-
-//     await newContractor.save();
-
-//     const populatedContractor = await Contractor.findById(newContractor._id)
-//       .populate("userId", "-password")
-//       .lean();
-
-//     return res.status(201).json({ 
-//       success: true, 
-//       message: "Contractor created successfully",
-//       data: populatedContractor
-//     });
-
-//   } catch (error) {
-//     console.error("Error adding contractor:", error);
-//     cleanUpFiles(req.files);
-    
-//     const statusCode = error.name === 'ValidationError' ? 400 : 500;
-//     return res.status(statusCode).json({ 
-//       success: false, 
-//       message: error.message || "Failed to create contractor",
-//       errorType: error.name || 'SERVER_ERROR'
-//     });
-//   }
-// };
-
-// // Get All Contractors (with pagination)
-// export const getContractors = async (req, res) => {
-//   try {
-//     const { contractorRole, page = 1, limit = 10, search } = req.query;
-//     const filter = {};
-    
-//     if (contractorRole) filter.contractorRole = contractorRole;
-    
-//     if (search) {
-//       filter.$or = [
-//         { name: { $regex: search, $options: 'i' } },
-//         { email: { $regex: search, $options: 'i' } },
-//         { phone: { $regex: search, $options: 'i' } },
-//         { contractorRole: { $regex: search, $options: 'i' } }
-//       ];
-//     }
-
-//     const options = {
-//       page: parseInt(page),
-//       limit: parseInt(limit),
-//       populate: [
-//         { path: "userId", select: "-password" },
-//         { path: "roleDetails.centering.workers", select: "name phone workerType" },
-//         { path: "roleDetails.steel.workers", select: "name phone workerType" },
-//         { path: "roleDetails.mason.workers", select: "name phone workerType" },
-//         { path: "roleDetails.carpenter.workers", select: "name phone workerType" },
-//         { path: "roleDetails.plumber.workers", select: "name phone workerType" },
-//         { path: "roleDetails.electrician.workers", select: "name phone workerType" },
-//         { path: "roleDetails.painter.workers", select: "name phone workerType" },
-//         { path: "roleDetails.tiles.workers", select: "name phone workerType" }
-//       ],
-//       sort: { createdAt: -1 }
-//     };
-
-//     const contractors = await Contractor.paginate(filter, options);
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractors 
-//     });
-//   } catch (error) {
-//     console.error("Error fetching contractors:", error);
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to fetch contractors",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Contractor by ID
-// export const getContractorById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-    
-//     let contractor;
-//     if (mongoose.Types.ObjectId.isValid(id)) {
-//       contractor = await Contractor.findById(id)
-//         .populate("userId", "-password")
-//         .populate("roleDetails.centering.workers", "name phone workerType")
-//         .populate("roleDetails.steel.workers", "name phone workerType")
-//         .populate("roleDetails.mason.workers", "name phone workerType")
-//         .populate("roleDetails.carpenter.workers", "name phone workerType")
-//         .populate("roleDetails.plumber.workers", "name phone workerType")
-//         .populate("roleDetails.electrician.workers", "name phone workerType")
-//         .populate("roleDetails.painter.workers", "name phone workerType")
-//         .populate("roleDetails.tiles.workers", "name phone workerType")
-//         .lean();
-//     } else {
-//       contractor = await Contractor.findOne({ userId: parseInt(id) })
-//         .populate("userId", "-password")
-//         .populate("roleDetails.centering.workers", "name phone workerType")
-//         .populate("roleDetails.steel.workers", "name phone workerType")
-//         .populate("roleDetails.mason.workers", "name phone workerType")
-//         .populate("roleDetails.carpenter.workers", "name phone workerType")
-//         .populate("roleDetails.plumber.workers", "name phone workerType")
-//         .populate("roleDetails.electrician.workers", "name phone workerType")
-//         .populate("roleDetails.painter.workers", "name phone workerType")
-//         .populate("roleDetails.tiles.workers", "name phone workerType")
-//         .lean();
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractor 
-//     });
-//   } catch (error) {
-//     console.error("Error fetching contractor:", error);
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to fetch contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Update Contractor
-// export const updateContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const updateData = req.body;
-
-//     // Find contractor
-//     let contractor;
-//     if (mongoose.Types.ObjectId.isValid(id)) {
-//       contractor = await Contractor.findById(id);
-//     } else {
-//       contractor = await Contractor.findOne({ userId: parseInt(id) });
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Update basic fields
-//     const fieldsToUpdate = [
-//       'name', 'email', 'gender', 'phone', 'alternatePhone', 
-//       'contractorRole', 'joiningDate', 'bankAccount', 'bankCode'
-//     ];
-    
-//     fieldsToUpdate.forEach(field => {
-//       if (updateData[field] !== undefined) {
-//         contractor[field] = updateData[field];
-//       }
-//     });
-
-//     // Update address
-//     if (updateData.address) {
-//       try {
-//         contractor.address = typeof updateData.address === 'string' 
-//           ? JSON.parse(updateData.address) 
-//           : updateData.address;
-//       } catch (e) {
-//         console.log("Address parsing error:", e);
-//         return res.status(400).json({ 
-//           success: false, 
-//           message: "Invalid address format",
-//           errorType: "VALIDATION_ERROR"
-//         });
-//       }
-//     }
-
-//     // Handle file updates
-//     if (req.files?.photo) {
-//       // Delete old photo if exists
-//       if (contractor.photo) {
-//         const oldPhotoPath = path.join(process.cwd(), 'public', contractor.photo);
-//         if (fs.existsSync(oldPhotoPath)) fs.unlinkSync(oldPhotoPath);
-//       }
-//       contractor.photo = `/uploads/${req.files.photo[0].filename}`;
-//     }
-    
-//     if (req.files?.contractorIdProof) {
-//       const newIdProofs = req.files.contractorIdProof.map(file => `/uploads/${file.filename}`);
-//       contractor.contractorIdProof = [...contractor.contractorIdProof, ...newIdProofs];
-//     }
-
-//     // Handle password update
-//     if (updateData.password) {
-//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
-//       contractor.password = hashedPassword;
-//       await User.findByIdAndUpdate(contractor.userId, { password: hashedPassword });
-//     }
-
-//     await contractor.save();
-
-//     // Update associated User
-//     const userUpdate = {};
-//     if (updateData.name) userUpdate.name = updateData.name;
-//     if (updateData.email) userUpdate.email = updateData.email;
-//     if (updateData.phone) userUpdate.phone = updateData.phone;
-
-//     if (Object.keys(userUpdate).length > 0) {
-//       await User.findByIdAndUpdate(contractor.userId, userUpdate);
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone workerType")
-//       .populate("roleDetails.steel.workers", "name phone workerType")
-//       .populate("roleDetails.mason.workers", "name phone workerType")
-//       .populate("roleDetails.carpenter.workers", "name phone workerType")
-//       .populate("roleDetails.plumber.workers", "name phone workerType")
-//       .populate("roleDetails.electrician.workers", "name phone workerType")
-//       .populate("roleDetails.painter.workers", "name phone workerType")
-//       .populate("roleDetails.tiles.workers", "name phone workerType");
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor updated successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     console.error("Error updating contractor:", error);
-//     cleanUpFiles(req.files);
-    
-//     const statusCode = error.name === 'ValidationError' ? 400 : 500;
-//     return res.status(statusCode).json({ 
-//       success: false, 
-//       message: error.message || "Failed to update contractor",
-//       errorType: error.name || 'SERVER_ERROR'
-//     });
-//   }
-// };
-
-// // Delete Contractor
-// export const deleteContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-    
-//     // Find contractor
-//     let contractor;
-//     if (mongoose.Types.ObjectId.isValid(id)) {
-//       contractor = await Contractor.findByIdAndDelete(id);
-//     } else {
-//       contractor = await Contractor.findOneAndDelete({ userId: parseInt(id) });
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Delete associated user
-//     await User.findOneAndDelete({ _id: contractor.userId });
-
-//     // Clean up files
-//     const deleteFile = (filePath) => {
-//       if (filePath) {
-//         const fullPath = path.join(process.cwd(), 'public', filePath);
-//         if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-//       }
-//     };
-
-//     if (contractor.photo) deleteFile(contractor.photo);
-//     if (contractor.contractorIdProof?.length > 0) {
-//       contractor.contractorIdProof.forEach(deleteFile);
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor deleted successfully"
-//     });
-//   } catch (error) {
-//     console.error("Error deleting contractor:", error);
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to delete contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Contractors by Role
-// export const getContractorsByRole = async (req, res) => {
-//   try {
-//     const { role } = req.params;
-    
-//     const validRoles = [
-//       'Centering Contractor', 'Steel Contractor', 'Mason Contractor',
-//       'Carpenter Contractor', 'Plumber Contractor', 'Electrician Contractor',
-//       'Painter Contractor', 'Tiles Contractor'
-//     ];
-    
-//     if (!validRoles.includes(role)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const contractors = await Contractor.find({ contractorRole: role })
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone workerType")
-//       .populate("roleDetails.steel.workers", "name phone workerType")
-//       .populate("roleDetails.mason.workers", "name phone workerType")
-//       .populate("roleDetails.carpenter.workers", "name phone workerType")
-//       .populate("roleDetails.plumber.workers", "name phone workerType")
-//       .populate("roleDetails.electrician.workers", "name phone workerType")
-//       .populate("roleDetails.painter.workers", "name phone workerType")
-//       .populate("roleDetails.tiles.workers", "name phone workerType")
-//       .lean();
-
-//     return res.status(200).json({
-//       success: true,
-//       data: contractors
-//     });
-//   } catch (error) {
-//     console.error("Error fetching contractors by role:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch contractors",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Worker Types for a Contractor
-// export const getWorkerTypes = async (req, res) => {
-//   try {
-//     const { contractorId } = req.params;
-    
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: contractorId },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-    
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-    
-//     const workerTypes = contractor.getWorkerTypes();
-    
-//     return res.status(200).json({
-//       success: true,
-//       data: workerTypes
-//     });
-//   } catch (error) {
-//     console.error("Error getting worker types:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to get worker types",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Add Worker to Contractor with Worker Type
-// export const addWorkerToContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-//     const { workerType } = req.body;
-
-//     // Validate worker type
-//     if (!workerType) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Worker type is required",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: contractorId },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     const worker = await Worker.findById(workerId);
-//     if (!worker) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Worker not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Get valid worker types for this contractor
-//     const validWorkerTypes = contractor.getWorkerTypes();
-//     if (!validWorkerTypes.includes(workerType)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid worker type for ${contractor.contractorRole}. Valid types: ${validWorkerTypes.join(', ')}`,
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Initialize roleDetails if needed
-//     if (!contractor.roleDetails) contractor.roleDetails = {};
-//     if (!contractor.roleDetails[roleField]) {
-//       contractor.roleDetails[roleField] = { workers: [] };
-//     }
-
-//     // Update worker type
-//     worker.workerType = workerType;
-//     await worker.save();
-
-//     // Add worker if not already present
-//     if (!contractor.roleDetails[roleField].workers.includes(workerId)) {
-//       contractor.roleDetails[roleField].workers.push(workerId);
-//       await contractor.save();
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate(`roleDetails.${roleField}.workers`, "name phone workerType");
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker added to contractor successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     console.error("Error adding worker to contractor:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to add worker to contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Remove Worker from Contractor
-// export const removeWorkerFromContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: contractorId },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Remove worker if exists
-//     if (contractor.roleDetails?.[roleField]?.workers) {
-//       contractor.roleDetails[roleField].workers = 
-//         contractor.roleDetails[roleField].workers.filter(id => id.toString() !== workerId);
-//       await contractor.save();
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate(`roleDetails.${roleField}.workers`, "name phone workerType");
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker removed from contractor successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     console.error("Error removing worker from contractor:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to remove worker from contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-
-
-
-
-
-// import Contractor from "../models/Contractor.js";
-// import User from "../models/User.js";
-// import Worker from "../models/Workers.js";
-// import bcrypt from "bcrypt";
-// import multer from "multer";
-// import path from "path";
-// import fs from "fs";
-
-// // Configure upload directory
-// const uploadDir = path.join(process.cwd(), "public", "uploads");
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
-
-// // Multer configuration
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, uploadDir),
-//   filename: (req, file, cb) => cb(null, `${Date.now()}${path.extname(file.originalname)}`),
-// });
-
-// export const upload = multer({ 
-//   storage,
-//   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-// }).fields([
-//   { name: "photo", maxCount: 1 },
-//   { name: "contractorIdProof", maxCount: 5 },
-// ]);
-
-// // Helper function to clean up uploaded files on error
-// const cleanUpFiles = (files) => {
-//   if (files?.photo?.[0]) {
-//     fs.unlinkSync(path.join(uploadDir, files.photo[0].filename));
-//   }
-//   if (files?.contractorIdProof) {
-//     files.contractorIdProof.forEach(file => {
-//       fs.unlinkSync(path.join(uploadDir, file.filename));
-//     });
-//   }
-// };
-
-// // Add Contractor
-// export const addContractor = async (req, res) => {
-//   try {
-//     const { name, email, phone, password, contractorRole, ...rest } = req.body;
-
-//     // Validate required fields
-//     if (!name || !email || !phone || !password || !contractorRole) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Required fields: name, email, phone, password, contractorRole",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Check if email exists
-//     const existingUser = await User.findOne({ email });
-//     if (existingUser) {
-//       return res.status(409).json({ 
-//         success: false, 
-//         message: "Email already registered",
-//         errorType: "DUPLICATE_ENTRY"
-//       });
-//     }
-
-//     // Hash password
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Create User
-//     const newUser = new User({ 
-//       name, 
-//       email, 
-//       password: hashedPassword, 
-//       role: "Contractor",
-//       phone
-//     });
-//     await newUser.save();
-
-//     // Process files
-//     const photo = req.files?.photo?.[0]?.filename ? `/uploads/${req.files.photo[0].filename}` : null;
-//     const contractorIdProof = req.files?.contractorIdProof?.map(file => `/uploads/${file.filename}`) || [];
-
-//     // Parse address if it's a string
-//     let parsedAddress = rest.address;
-//     try {
-//       if (typeof rest.address === 'string') parsedAddress = JSON.parse(rest.address);
-//     } catch (e) {
-//       console.log("Address parsing error:", e);
-//       cleanUpFiles(req.files);
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Invalid address format",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Create Contractor
-//     const newContractor = new Contractor({
-//       userId: newUser._id,
-//       name,
-//       email,
-//       phone,
-//       password: hashedPassword,
-//       contractorRole,
-//       address: parsedAddress,
-//       gender: rest.gender,
-//       alternatePhone: rest.alternatePhone,
-//       joiningDate: rest.joiningDate,
-//       bankAccount: rest.bankAccount,
-//       bankCode: rest.bankCode,
-//       photo,
-//       contractorIdProof
-//     });
-
-//     await newContractor.save();
-
-//     const populatedContractor = await Contractor.findById(newContractor._id)
-//       .populate("userId", "-password")
-//       .lean();
-
-//     return res.status(201).json({ 
-//       success: true, 
-//       message: "Contractor created successfully",
-//       data: populatedContractor
-//     });
-
-//   } catch (error) {
-//     console.error("Error adding contractor:", error);
-//     cleanUpFiles(req.files);
-    
-//     const statusCode = error.name === 'ValidationError' ? 400 : 500;
-//     return res.status(statusCode).json({ 
-//       success: false, 
-//       message: error.message || "Failed to create contractor",
-//       errorType: error.name || 'SERVER_ERROR'
-//     });
-//   }
-// };
-
-// // Get All Contractors (with pagination)
-// export const getContractors = async (req, res) => {
-//   try {
-//     const { contractorRole, page = 1, limit = 10 } = req.query;
-//     const filter = {};
-    
-//     if (contractorRole) filter.contractorRole = contractorRole;
-
-//     const options = {
-//       page: parseInt(page),
-//       limit: parseInt(limit),
-//       populate: [
-//         { path: "userId", select: "-password" },
-//         { path: "roleDetails.centering.workers", select: "name phone workerType" },
-//         { path: "roleDetails.steel.workers", select: "name phone workerType" },
-//         { path: "roleDetails.mason.workers", select: "name phone workerType" },
-//         { path: "roleDetails.carpenter.workers", select: "name phone workerType" },
-//         { path: "roleDetails.plumber.workers", select: "name phone workerType" },
-//         { path: "roleDetails.electrician.workers", select: "name phone workerType" },
-//         { path: "roleDetails.painter.workers", select: "name phone workerType" },
-//         { path: "roleDetails.tiles.workers", select: "name phone workerType" }
-//       ],
-//       sort: { createdAt: -1 }
-//     };
-
-//     const contractors = await Contractor.paginate(filter, options);
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractors 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to fetch contractors",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Contractor by ID
-// export const getContractorById = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-    
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOne({ 
-//         $or: [{ _id: parseInt(id) }, { userId: parseInt(id) }]
-//       })
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone workerType")
-//       .populate("roleDetails.steel.workers", "name phone workerType")
-//       .populate("roleDetails.mason.workers", "name phone workerType")
-//       .populate("roleDetails.carpenter.workers", "name phone workerType")
-//       .populate("roleDetails.plumber.workers", "name phone workerType")
-//       .populate("roleDetails.electrician.workers", "name phone workerType")
-//       .populate("roleDetails.painter.workers", "name phone workerType")
-//       .populate("roleDetails.tiles.workers", "name phone workerType")
-//       .lean();
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       data: contractor 
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to fetch contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Update Contractor
-// export const updateContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const updateData = req.body;
-
-//     // Find contractor
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOne({ 
-//         $or: [{ _id: parseInt(id) }, { userId: parseInt(id) }]
-//       });
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Update basic fields
-//     const fieldsToUpdate = [
-//       'name', 'email', 'gender', 'phone', 'alternatePhone', 
-//       'contractorRole', 'joiningDate', 'bankAccount', 'bankCode'
-//     ];
-    
-//     fieldsToUpdate.forEach(field => {
-//       if (updateData[field] !== undefined) {
-//         contractor[field] = updateData[field];
-//       }
-//     });
-
-//     // Update address
-//     if (updateData.address) {
-//       try {
-//         contractor.address = typeof updateData.address === 'string' 
-//           ? JSON.parse(updateData.address) 
-//           : updateData.address;
-//       } catch (e) {
-//         console.log("Address parsing error:", e);
-//         return res.status(400).json({ 
-//           success: false, 
-//           message: "Invalid address format",
-//           errorType: "VALIDATION_ERROR"
-//         });
-//       }
-//     }
-
-//     // Handle file updates
-//     if (req.files?.photo) {
-//       // Delete old photo if exists
-//       if (contractor.photo) {
-//         const oldPhotoPath = path.join(process.cwd(), 'public', contractor.photo);
-//         if (fs.existsSync(oldPhotoPath)) fs.unlinkSync(oldPhotoPath);
-//       }
-//       contractor.photo = `/uploads/${req.files.photo[0].filename}`;
-//     }
-    
-//     if (req.files?.contractorIdProof) {
-//       const newIdProofs = req.files.contractorIdProof.map(file => `/uploads/${file.filename}`);
-//       contractor.contractorIdProof = [...contractor.contractorIdProof, ...newIdProofs];
-//     }
-
-//     // Handle password update
-//     if (updateData.password) {
-//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
-//       contractor.password = hashedPassword;
-//       await User.findByIdAndUpdate(contractor.userId, { password: hashedPassword });
-//     }
-
-//     await contractor.save();
-
-//     // Update associated User
-//     const userUpdate = {};
-//     if (updateData.name) userUpdate.name = updateData.name;
-//     if (updateData.email) userUpdate.email = updateData.email;
-//     if (updateData.phone) userUpdate.phone = updateData.phone;
-
-//     if (Object.keys(userUpdate).length > 0) {
-//       await User.findByIdAndUpdate(contractor.userId, userUpdate);
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone workerType")
-//       .populate("roleDetails.steel.workers", "name phone workerType")
-//       .populate("roleDetails.mason.workers", "name phone workerType")
-//       .populate("roleDetails.carpenter.workers", "name phone workerType")
-//       .populate("roleDetails.plumber.workers", "name phone workerType")
-//       .populate("roleDetails.electrician.workers", "name phone workerType")
-//       .populate("roleDetails.painter.workers", "name phone workerType")
-//       .populate("roleDetails.tiles.workers", "name phone workerType");
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor updated successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     console.error("Error updating contractor:", error);
-//     cleanUpFiles(req.files);
-    
-//     const statusCode = error.name === 'ValidationError' ? 400 : 500;
-//     return res.status(statusCode).json({ 
-//       success: false, 
-//       message: error.message || "Failed to update contractor",
-//       errorType: error.name || 'SERVER_ERROR'
-//     });
-//   }
-// };
-
-// // Delete Contractor
-// export const deleteContractor = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-    
-//     // Find contractor
-//     let contractor;
-//     if (!isNaN(id)) {
-//       contractor = await Contractor.findOneAndDelete({ 
-//         $or: [{ _id: parseInt(id) }, { userId: parseInt(id) }]
-//       });
-//     }
-
-//     if (!contractor) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Delete associated user
-//     await User.findOneAndDelete({ _id: contractor.userId });
-
-//     // Clean up files
-//     const deleteFile = (filePath) => {
-//       if (filePath) {
-//         const fullPath = path.join(process.cwd(), 'public', filePath);
-//         if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-//       }
-//     };
-
-//     if (contractor.photo) deleteFile(contractor.photo);
-//     if (contractor.contractorIdProof?.length > 0) {
-//       contractor.contractorIdProof.forEach(deleteFile);
-//     }
-
-//     return res.status(200).json({ 
-//       success: true, 
-//       message: "Contractor deleted successfully"
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Failed to delete contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Contractors by Role
-// export const getContractorsByRole = async (req, res) => {
-//   try {
-//     const { role } = req.params;
-    
-//     const validRoles = [
-//       'Centering Contractor', 'Steel Contractor', 'Mason Contractor',
-//       'Carpenter Contractor', 'Plumber Contractor', 'Electrician Contractor',
-//       'Painter Contractor', 'Tiles Contractor'
-//     ];
-    
-//     if (!validRoles.includes(role)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const contractors = await Contractor.find({ contractorRole: role })
-//       .populate("userId", "-password")
-//       .populate("roleDetails.centering.workers", "name phone workerType")
-//       .populate("roleDetails.steel.workers", "name phone workerType")
-//       .populate("roleDetails.mason.workers", "name phone workerType")
-//       .populate("roleDetails.carpenter.workers", "name phone workerType")
-//       .populate("roleDetails.plumber.workers", "name phone workerType")
-//       .populate("roleDetails.electrician.workers", "name phone workerType")
-//       .populate("roleDetails.painter.workers", "name phone workerType")
-//       .populate("roleDetails.tiles.workers", "name phone workerType")
-//       .lean();
-
-//     return res.status(200).json({
-//       success: true,
-//       data: contractors
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch contractors",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Get Worker Types for a Contractor
-// export const getWorkerTypes = async (req, res) => {
-//   try {
-//     const { contractorId } = req.params;
-    
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: parseInt(contractorId) },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-    
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-    
-//     const workerTypes = contractor.getWorkerTypes();
-    
-//     return res.status(200).json({
-//       success: true,
-//       data: workerTypes
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to get worker types",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Add Worker to Contractor with Worker Type
-// export const addWorkerToContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-//     const { workerType } = req.body;
-
-//     // Validate worker type
-//     if (!workerType) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Worker type is required",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: parseInt(contractorId) },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     const worker = await Worker.findById(workerId);
-//     if (!worker) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Worker not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     // Get valid worker types for this contractor
-//     const validWorkerTypes = contractor.getWorkerTypes();
-//     if (!validWorkerTypes.includes(workerType)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Invalid worker type for ${contractor.contractorRole}. Valid types: ${validWorkerTypes.join(', ')}`,
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Initialize roleDetails if needed
-//     if (!contractor.roleDetails) contractor.roleDetails = {};
-//     if (!contractor.roleDetails[roleField]) {
-//       contractor.roleDetails[roleField] = { workers: [] };
-//     }
-
-//     // Update worker type
-//     worker.workerType = workerType;
-//     await worker.save();
-
-//     // Add worker if not already present
-//     if (!contractor.roleDetails[roleField].workers.includes(workerId)) {
-//       contractor.roleDetails[roleField].workers.push(workerId);
-//       await contractor.save();
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate(`roleDetails.${roleField}.workers`, "name phone workerType");
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker added to contractor successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to add worker to contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-// // Remove Worker from Contractor
-// export const removeWorkerFromContractor = async (req, res) => {
-//   try {
-//     const { contractorId, workerId } = req.params;
-
-//     const contractor = await Contractor.findOne({ 
-//       $or: [
-//         { _id: parseInt(contractorId) },
-//         { userId: parseInt(contractorId) }
-//       ]
-//     });
-
-//     if (!contractor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Contractor not found",
-//         errorType: "NOT_FOUND"
-//       });
-//     }
-
-//     const roleFieldMap = {
-//       'Centering Contractor': 'centering',
-//       'Steel Contractor': 'steel',
-//       'Mason Contractor': 'mason',
-//       'Carpenter Contractor': 'carpenter',
-//       'Plumber Contractor': 'plumber',
-//       'Electrician Contractor': 'electrician',
-//       'Painter Contractor': 'painter',
-//       'Tiles Contractor': 'tiles'
-//     };
-
-//     const roleField = roleFieldMap[contractor.contractorRole];
-    
-//     if (!roleField) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid contractor role",
-//         errorType: "VALIDATION_ERROR"
-//       });
-//     }
-
-//     // Remove worker if exists
-//     if (contractor.roleDetails?.[roleField]?.workers) {
-//       contractor.roleDetails[roleField].workers = 
-//         contractor.roleDetails[roleField].workers.filter(id => id.toString() !== workerId);
-//       await contractor.save();
-//     }
-
-//     const updatedContractor = await Contractor.findById(contractor._id)
-//       .populate("userId", "-password")
-//       .populate(`roleDetails.${roleField}.workers`, "name phone workerType");
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Worker removed from contractor successfully",
-//       data: updatedContractor
-//     });
-//   } catch (error) {
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to remove worker from contractor",
-//       errorType: "SERVER_ERROR"
-//     });
-//   }
-// };
-
-

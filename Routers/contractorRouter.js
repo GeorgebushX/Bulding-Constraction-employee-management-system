@@ -1,10 +1,10 @@
 import express from "express";
 import {
-  addContractor,
-  getContractors,
+  createContractor,
+  getAllContractors,
   getContractorById,
-  updateContractor,
-  deleteContractor,
+  updateContractorById,
+  deleteContractorById,
   deleteAllContractors,
   upload
 } from "../Controllers/contractorController.js";
@@ -13,11 +13,11 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/contractors",upload,authMiddleware, addContractor);
-router.get("/contractors",authMiddleware, getContractors);
+router.post("/contractors",upload,authMiddleware, createContractor);
+router.get("/contractors",authMiddleware, getAllContractors);
 router.get("/contractors/:id",authMiddleware, getContractorById);
-router.put("/contractors/:id", upload,authMiddleware, updateContractor);
-router.delete("/contractors/:id",authMiddleware, deleteContractor);
+router.put("/contractors/:id", upload,authMiddleware, updateContractorById);
+router.delete("/contractors/:id",authMiddleware, deleteContractorById);
 router.delete("/contractors",authMiddleware, deleteAllContractors);
 
 

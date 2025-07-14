@@ -15,6 +15,8 @@ const addressSchema = new mongoose.Schema({
 const contractorSchema = new mongoose.Schema({
   _id: Number,
   userId: { type: Number, ref: "User", required: true },
+  site: { type: Number, ref: 'Site' },
+  centeringSupervisor: { type: Number, ref: "CenteringSupervisor", required: true },
   name: { type: String, required: true },
   password: { type: String },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
@@ -32,7 +34,7 @@ const contractorSchema = new mongoose.Schema({
   contractorRole: {
     type: String,
     enum: [
-      '', 
+      'Centering Contractor', 
       'Steel Contractor', 
       'Mason Contractor', 
       'Carpenter Contractor', 
@@ -41,74 +43,9 @@ const contractorSchema = new mongoose.Schema({
       'Painter Contractor', 
       'Tiles Contractor'
     ],
-    required: true
+    default: "Centering Contractor" 
   },
-  roleDetails: {
-    centering: {
-      workerType: { 
-        type: String,
-        enum: ["Fitter", "Helper", "Temporary Centering Worker"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    steel: {
-      workerType: { 
-        type: String,
-        enum: ["Fitter", "Helper", "Temporary Steel Worker"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    mason: {
-      workerType: { 
-        type: String,
-        enum: ["Mason", "Chital", "Material Handler", "Temporary Worker"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    carpenter: {
-      workerType: { 
-        type: String,
-        enum: ["Fitter", "Helper", "Temporary Carpenter"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    plumber: {
-      workerType: { 
-        type: String,
-        enum: ["Plumber", "Helper", "Temporary Plumber"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    electrician: {
-      workerType: { 
-        type: String,
-        enum: ["Electrician", "Helper", "Temporary Electrician"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    painter: {
-      workerType: { 
-        type: String,
-        enum: ["Painter", "Helper", "Temporary Painter"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    },
-    tiles: {
-      workerType: { 
-        type: String,
-        enum: ["Fitter", "Helper", "Temporary Tiles Worker"],
-        default: null
-      },
-      workers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Worker' }]
-    }
-  },
+  bankName: { type: String },
   bankAccount: { type: String, trim: true },
   bankCode: { type: String, trim: true },
   contractorIdProof: [{ type: String }],
@@ -134,7 +71,7 @@ contractorSchema.methods.formatDate = function(date) {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const year = date.getFullYear();
-    return `${month}/${day}/${year}`;
+    return `${day}/${month}/${year}`;
   }
   
   if (typeof date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
@@ -146,48 +83,15 @@ contractorSchema.methods.formatDate = function(date) {
     const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
     const day = parsedDate.getDate().toString().padStart(2, '0');
     const year = parsedDate.getFullYear();
-    return `${month}/${day}/${year}`;
+    return `${day}/${month}/${year}`;
   }
   
   return date;
 };
 
-// Middleware to handle roleDetails
-contractorSchema.pre('save', function(next) {
-  const roleMap = {
-    'Centering Contractor': 'centering',
-    'Steel Contractor': 'steel',
-    'Mason Contractor': 'mason',
-    'Carpenter Contractor': 'carpenter',
-    'Plumber Contractor': 'plumber',
-    'Electrician Contractor': 'electrician',
-    'Painter Contractor': 'painter',
-    'Tiles Contractor': 'tiles'
-  };
-
-  const activeRole = roleMap[this.contractorRole];
-  
-  // Initialize all roles as null
-  const initializedRoleDetails = {};
-  Object.values(roleMap).forEach(role => {
-    initializedRoleDetails[role] = null;
-  });
-
-  // Set the active role
-  if (activeRole) {
-    initializedRoleDetails[activeRole] = {
-      workerType: this.roleDetails?.[activeRole]?.workerType || null,
-      workers: this.roleDetails?.[activeRole]?.workers || []
-    };
-  }
-
-  this.roleDetails = initializedRoleDetails;
-  next();
-});
-
 // Apply auto-increment plugin
 contractorSchema.plugin(AutoIncrement, {id: 'contractor_id', inc_field: '_id'});
 
-const Contractor = mongoose.model('Contractor', contractorSchema);
+const Contractor = mongoose.model('CenteringContractor', contractorSchema);
 
 export default Contractor;
