@@ -325,15 +325,42 @@ const formatDate = (date) => {
 };
 
 // Helper function to validate future or current date
+
 const validateStartDate = (dateStr) => {
+  if (!dateStr) return false; // Handle empty input
+  
+  // Check if the string matches DD/MM/YYYY format
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    return false;
+  }
+
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
+  today.setHours(0, 0, 0, 0); // Set to start of day (00:00:00)
+
+  // Split DD/MM/YYYY into day, month, year
   const [day, month, year] = dateStr.split('/');
-  const inputDate = new Date(`${day}/${month}/${year}`);
-  
+
+  // Create a new Date in ISO format (YYYY-MM-DD) to avoid parsing issues
+  const inputDate = new Date(`${year}-${month}-${day}`);
+
+  // Check if the parsed date is valid (e.g., no "Invalid Date")
+  if (isNaN(inputDate.getTime())) {
+    return false;
+  }
+
+  // Compare dates (inputDate should be >= today)
   return inputDate >= today;
 };
+
+// const validateStartDate = (dateStr) => {
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+  
+//   const [day, month, year] = dateStr.split('/');
+//   const inputDate = new Date(`${day}/${month}/${year}`);
+  
+//   return inputDate >= today;
+// };
 
 /**
  * @desc    Create a new client
