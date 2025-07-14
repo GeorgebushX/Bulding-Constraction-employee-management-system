@@ -398,12 +398,12 @@ export const updateSite = async (req, res) => {
     if (updateData.contractors) {
       const contractorIds = JSON.parse(updateData.contractors);
       const contractorsExist = await Contractor.countDocuments({ _id: { $in: contractorIds } });
-      if (contractorsExist !== contractorIds.length) {
-        return res.status(404).json({
-          success: false,
-          message: "One or more contractors not found"
-        });
-      }
+      // if (contractorsExist !== contractorIds.length) {
+      //   return res.status(404).json({
+      //     success: false,
+      //     message: "One or more contractors not found"
+      //   });
+      // }
       site.workersCount.contractors = contractorIds;
     }
 
@@ -411,12 +411,12 @@ export const updateSite = async (req, res) => {
     if (updateData.supervisors) {
       const supervisorIds = JSON.parse(updateData.supervisors);
       const supervisorsExist = await Supervisor.countDocuments({ _id: { $in: supervisorIds } });
-      if (supervisorsExist !== supervisorIds.length) {
-        return res.status(404).json({
-          success: false,
-          message: "One or more supervisors not found"
-        });
-      }
+      // if (supervisorsExist !== supervisorIds.length) {
+      //   return res.status(404).json({
+      //     success: false,
+      //     message: "One or more supervisors not found"
+      //   });
+      // }
       site.workersCount.supervisors = supervisorIds;
     }
 
