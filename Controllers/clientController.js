@@ -330,7 +330,7 @@ const validateStartDate = (dateStr) => {
   today.setHours(0, 0, 0, 0);
   
   const [day, month, year] = dateStr.split('/');
-  const inputDate = new Date(`${year}-${month}-${day}`);
+  const inputDate = new Date(`${day}/${month}/${year}`);
   
   return inputDate >= today;
 };
