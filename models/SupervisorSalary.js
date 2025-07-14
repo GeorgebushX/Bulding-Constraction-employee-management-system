@@ -78,18 +78,17 @@
 
 import mongoose from "mongoose";
 
-// Helper function to format dates as MM/DD/YYYY
+// Helper function to format dates as DD/MM/YYYY
 function formatDate(date) {
     if (!date) return null;
-  
+    
     const parsedDate = new Date(date);
     if (!isNaN(parsedDate.getTime())) {
-      const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
       const day = parsedDate.getDate().toString().padStart(2, '0');
+      const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
       const year = parsedDate.getFullYear();
-      return `${davy}/${month}/${year}`;
+      return `${day}/${month}/${year}`;
     }
-  
     return date;
   }
 
@@ -155,7 +154,7 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     paymentDate: {
         type: String,
-        default: () => formatDate(new Date())
+        default: null
     }
 }, { timestamps: true });
 

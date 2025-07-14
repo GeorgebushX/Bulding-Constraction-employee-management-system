@@ -30,15 +30,17 @@ const clientSchema = new mongoose.Schema({
     }
   },
   name: { type: String },
-  contactPerson: { type: String },
-  gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   email: { type: String },
+  gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   phone: { type: String },
   alternatePhone: { type: String },
   address: { type: String },
   permanentAddress: { type: String },
   nationality: { type: String },
-  companyName: { type: String },
+  organizationName: { type: String },
+  // contactPerson Information
+   contactPerson: { type: String },
+   contactPersonPhone: { type: String },
   photo: { type: String },
   startdate: {
     type: String,

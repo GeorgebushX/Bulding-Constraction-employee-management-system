@@ -73,7 +73,6 @@ export const createSalary = async (req, res) => {
         message: "No attendance records found"
       });
     }
-
     const [day, month, year] = date.split('/').map(Number);
     const jsDate = new Date(year, month - 1, day);
     const week = getWeekNumber(jsDate);
