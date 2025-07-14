@@ -165,11 +165,22 @@ const siteSchema = new mongoose.Schema({
       return this.totalAreaSqFt * this.oneAreaSqFtAmount;
     }
   },
-  supervisors: { 
-    type: Number,
-    ref: "Supervisor",
+
+    workersCount: {
+    supervisors: [{ 
+      type: Number, 
+      ref: "Supervisor" 
+    }],
+    contractors: [{ 
+      type: Number, 
+      ref: "Contractor" 
+    }]
   },
-  contractors: { type: Number, ref: "Contractor" },
+  // supervisors: { 
+  //   type: Number,
+  //   ref: "Supervisor",
+  // },
+  // contractors: { type: Number, ref: "Contractor" },
   startDate: {
     type: String,
     default: () => formatDate(new Date()),
