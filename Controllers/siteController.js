@@ -245,24 +245,24 @@ export const addSite = async (req, res) => {
     if (supervisors) {
       const supervisorIds = JSON.parse(supervisors);
       const supervisorsExist = await Supervisor.countDocuments({ _id: { $in: supervisorIds } });
-      if (supervisorsExist !== supervisorIds.length) {
-        return res.status(404).json({
-          success: false,
-          message: "One or more supervisors not found"
-        });
-      }
+      // if (supervisorsExist !== supervisorIds.length) {
+      //   return res.status(404).json({
+      //     success: false,
+      //     message: "One or more supervisors not found"
+      //   });
+      // }
     }
 
     // Validate contractors exist
     if (contractors) {
       const contractorIds = JSON.parse(contractors);
       const contractorsExist = await Contractor.countDocuments({ _id: { $in: contractorIds } });
-      if (contractorsExist !== contractorIds.length) {
-        return res.status(404).json({
-          success: false,
-          message: "One or more contractors not found"
-        });
-      }
+      // if (contractorsExist !== contractorIds.length) {
+      //   return res.status(404).json({
+      //     success: false,
+      //     message: "One or more contractors not found"
+      //   });
+      // }
     }
 
     const siteMap = req.file ? `/uploads/${req.file.filename}` : null;
