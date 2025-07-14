@@ -326,25 +326,55 @@ const formatDate = (date) => {
 
 // Helper function to validate future or current date
 
+// const validateStartDate = (dateStr) => {
+//   if (!dateStr) return false; // Handle empty input
+  
+//   // Check if the string matches DD/MM/YYYY format
+//   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+//     return false;
+//   }
+
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0); // Set to start of day (00:00:00)
+
+//   // Split DD/MM/YYYY into day, month, year
+//   const [day, month, year] = dateStr.split('/');
+
+//   // Create a new Date in ISO format (YYYY-MM-DD) to avoid parsing issues
+//   const inputDate = new Date(`${year}-${month}-${day}`);
+
+//   // Check if the parsed date is valid (e.g., no "Invalid Date")
+//   if (isNaN(inputDate.getTime())) {
+//     return false;
+//   }
+
+//   // Compare dates (inputDate should be >= today)
+//   return inputDate >= today;
+// };
+
 const validateStartDate = (dateStr) => {
   if (!dateStr) return false; // Handle empty input
-  
+
   // Check if the string matches DD/MM/YYYY format
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
     return false;
   }
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Set to start of day (00:00:00)
+  today.setHours(0, 0, 0, 0); // Set to midnight for accurate comparison
 
   // Split DD/MM/YYYY into day, month, year
-  const [day, month, year] = dateStr.split('/');
+  const [day, month, year] = dateStr.split('/').map(Number);
 
-  // Create a new Date in ISO format (YYYY-MM-DD) to avoid parsing issues
-  const inputDate = new Date(`${year}-${month}-${day}`);
+  // Create a Date object (months are 0-indexed, so subtract 1)
+  const inputDate = new Date(year, month - 1, day);
 
-  // Check if the parsed date is valid (e.g., no "Invalid Date")
-  if (isNaN(inputDate.getTime())) {
+  // Check if the date is invalid (e.g., 31/02/2025)
+  if (
+    inputDate.getDate() !== day ||
+    inputDate.getMonth() !== month - 1 ||
+    inputDate.getFullYear() !== year
+  ) {
     return false;
   }
 
