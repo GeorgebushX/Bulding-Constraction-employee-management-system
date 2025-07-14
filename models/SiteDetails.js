@@ -135,16 +135,6 @@ function validateEndDate(startDateStr, endDateStr) {
   
   return endDate > startDate;
 }
-
-// Sub-schema for workers count
-const workersCountSchema = new mongoose.Schema({
-  supervisorId: { 
-    type: Number,
-    ref: "Supervisor",
-  },
-  contractors: { type: Number, ref: "Contractors",},
-}, { _id: false });
-
 // Main Site schema
 const siteSchema = new mongoose.Schema({
   _id: Number,  
@@ -164,7 +154,7 @@ const siteSchema = new mongoose.Schema({
     required: true,
     min: 1 
   },
-  oneAreaSqFt: { 
+  oneAreaSqFtAmount: { 
     type: Number, 
     required: true,
     min: 1 
@@ -172,9 +162,14 @@ const siteSchema = new mongoose.Schema({
   totalBudget: { 
     type: Number,
     default: function() {
-      return this.totalAreaSqFt * this.oneAreaSqFt;
+      return this.totalAreaSqFt * this.oneAreaSqFtAmount;
     }
   },
+  supervisors: { 
+    type: Number,
+    ref: "Supervisor",
+  },
+  contractors: { type: Number, ref: "Contractor" },
   startDate: {
     type: String,
     default: () => formatDate(new Date()),
@@ -210,8 +205,8 @@ const siteSchema = new mongoose.Schema({
 
 // Middleware to calculate budget before saving
 siteSchema.pre('save', function(next) {
-  if (this.isModified('totalAreaSqFt') || this.isModified('oneAreaSqFt')) {
-    this.totalBudget = this.totalAreaSqFt * this.oneAreaSqFt;
+  if (this.isModified('totalAreaSqFt') || this.isModified('oneAreaSqFtAmount')) {
+    this.totalBudget = this.totalAreaSqFt * this.oneAreaSqFtAmount;
   }
   next();
 });

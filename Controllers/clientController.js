@@ -434,7 +434,7 @@ export const createClient = async (req, res) => {
     }
 
     // Handle photo upload
-    const photo = req.file ? `/uploads/${req.file.filename}` : undefined;
+    const photo = req.file ? `/uploads/${req.file.filename}` : null;
 
     const newClient = new Client({
       name,
