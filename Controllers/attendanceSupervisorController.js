@@ -4,97 +4,38 @@ import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
-// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
-// const formatDate = (dateString) => {
-//   if (!dateString) return '';
-  
-//   // If already in DD/MM/YYYY format, return as-is
-//   if (dateString.includes('/')) {
-//     return dateString;
-//   }
-  
-//   // Convert from YYYY-MM-DD to DD/MM/YYYY
-//   const [year, month, day] = dateString.split('-');
-//   return `${day}/${month}/${year}`;
-// };
-
-// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
-// const parseToDbDate = (dateString) => {
-//   if (!dateString) return '';
-  
-//   // If already in YYYY-MM-DD format, return as-is
-//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-//     return dateString;
-//   }
-  
-//   // Convert from DD/MM/YYYY to YYYY-MM-DD
-//   const [day, month, year] = dateString.split('/');
-//   return `${year}-${month}-${day}`;
-// };
-
-// // 1. GET all attendance records
-// export const getAllAttendance = async (req, res) => {
-//   try {
-//     const attendanceRecords = await SupervisorAttendance.find({})
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .lean();
-
-//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
-
-//     const formattedData = validRecords.map(record => ({
-//       _id: record._id,
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email
-//       },
-//       status: record.status
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       data: formattedData
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
-
-
-// Helper function to get current date in YYYY-MM-DD format
-const getCurrentDate = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
   if (!dateString) return '';
+  
+  // If already in DD/MM/YYYY format, return as-is
+  if (dateString.includes('/')) {
+    return dateString;
+  }
+  
+  // Convert from YYYY-MM-DD to DD/MM/YYYY
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+const parseToDbDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // If already in YYYY-MM-DD format, return as-is
+  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+    return dateString;
+  }
+  
+  // Convert from DD/MM/YYYY to YYYY-MM-DD
+  const [day, month, year] = dateString.split('/');
+  return `${year}-${month}-${day}`;
+};
+
+// 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
   try {
-    const currentDate = getCurrentDate();
-
-    // Get all supervisors
-    const supervisors = await Supervisor.find({});
-    
-    // Get attendance records for current date
-    const attendanceRecords = await SupervisorAttendance.find({ date: currentDate })
+    const attendanceRecords = await SupervisorAttendance.find({})
       .populate({
         path: 'supervisorId',
         select: '_id name email photo',
@@ -102,30 +43,19 @@ export const getAllAttendance = async (req, res) => {
       })
       .lean();
 
-    // Create a map of existing attendance records by supervisorId
-    const attendanceMap = new Map();
-    attendanceRecords.forEach(record => {
-      if (record.supervisorId) {
-        attendanceMap.set(record.supervisorId._id.toString(), record);
-      }
-    });
+    const validRecords = attendanceRecords.filter(record => record.supervisorId);
 
-    // Prepare the final data
-    const formattedData = supervisors.map(supervisor => {
-      const existingRecord = attendanceMap.get(supervisor._id.toString());
-      
-      return {
-        _id: existingRecord?._id || new mongoose.Types.ObjectId(), // Generate new ID if no record exists
-        date: formatDate(currentDate),
-        supervisor: {
-          _id: supervisor._id,
-          photo: supervisor.photo || null,
-          name: supervisor.name,
-          email: supervisor.email
-        },
-        status: existingRecord?.status || null // Default to null if no record exists
-      };
-    });
+    const formattedData = validRecords.map(record => ({
+      _id: record._id,
+      date: formatDate(record.date),
+      supervisor: {
+        _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
+        name: record.supervisorId.name,
+        email: record.supervisorId.email
+      },
+      status: record.status
+    }));
 
     res.status(200).json({
       success: true,
@@ -138,6 +68,76 @@ export const getAllAttendance = async (req, res) => {
     });
   }
 };
+
+
+// // Helper function to get current date in YYYY-MM-DD format
+// const getCurrentDate = () => {
+//   const today = new Date();
+//   const year = today.getFullYear();
+//   const month = String(today.getMonth() + 1).padStart(2, '0');
+//   const day = String(today.getDate()).padStart(2, '0');
+//   return `${year}-${month}-${day}`;
+// };
+
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const currentDate = getCurrentDate();
+
+//     // Get all supervisors
+//     const supervisors = await Supervisor.find({});
+    
+//     // Get attendance records for current date
+//     const attendanceRecords = await SupervisorAttendance.find({ date: currentDate })
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     // Create a map of existing attendance records by supervisorId
+//     const attendanceMap = new Map();
+//     attendanceRecords.forEach(record => {
+//       if (record.supervisorId) {
+//         attendanceMap.set(record.supervisorId._id.toString(), record);
+//       }
+//     });
+
+//     // Prepare the final data
+//     const formattedData = supervisors.map(supervisor => {
+//       const existingRecord = attendanceMap.get(supervisor._id.toString());
+      
+//       return {
+//         _id: existingRecord?._id || new mongoose.Types.ObjectId(), // Generate new ID if no record exists
+//         date: formatDate(currentDate),
+//         supervisor: {
+//           _id: supervisor._id,
+//           photo: supervisor.photo || null,
+//           name: supervisor.name,
+//           email: supervisor.email
+//         },
+//         status: existingRecord?.status || null // Default to null if no record exists
+//       };
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
 
 // 2. UPDATE Attendance by ID
 export const updateAttendanceById = async (req, res) => {
