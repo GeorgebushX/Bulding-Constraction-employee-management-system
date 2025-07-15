@@ -1,5 +1,5 @@
 // controllers/supervisorController.js
-import Supervisor from "../models/Supervisor.js";
+import Supervisor from "../models/CenteringSupervisor.js";
 import User from "../models/User.js";
 import Site from "../models/SiteDetails.js";
 import bcrypt from "bcrypt";

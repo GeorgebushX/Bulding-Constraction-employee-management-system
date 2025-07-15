@@ -31,7 +31,8 @@
 // export default defaultAttendance;
 
 
-import Supervisor from "../models/Supervisor.js";
+// import Supervisor from "../models/Supervisor.js";
+import Supervisor from "../models/CenteringSupervisor.js";
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 
 const defaultAttendance = async (req, res, next) => {

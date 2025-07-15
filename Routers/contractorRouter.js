@@ -13,12 +13,13 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/contractors",upload,authMiddleware, createContractor);
-router.get("/contractors",authMiddleware, getAllContractors);
-router.get("/contractors/:id",authMiddleware, getContractorById);
-router.put("/contractors/:id", upload,authMiddleware, updateContractorById);
-router.delete("/contractors/:id",authMiddleware, deleteContractorById);
-router.delete("/contractors",authMiddleware, deleteAllContractors);
+router.post("/centering/contractors",upload,authMiddleware, createContractor);
+router.get("/centering/contractors",authMiddleware, getAllContractors);
+router.get("/centering/contractors/:id",authMiddleware, getContractorById);
+router.get("/centering/contractors/:id",authMiddleware, getContractorById);
+router.put("/centering/contractors/:id", upload,authMiddleware, updateContractorById);
+router.delete("/centering/contractors/:id",authMiddleware, deleteContractorById);
+router.delete("/centering/contractors",authMiddleware, deleteAllContractors);
 
 
 export default router;

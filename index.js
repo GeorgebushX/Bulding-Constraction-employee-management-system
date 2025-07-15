@@ -16,8 +16,9 @@ dotenv.config();
 
 // import routes
 import authRouter from './Routers/auth.js';
-import supervisorRouter from "./Routers/supervisorRouter.js"
-import contractorRouter from "./Routers/contractorRouter.js"
+
+import centeringsupervisorRouter from "././models/CenteringSupervisor.js"
+import centeringcontractorRouter from "./Routers/contractorRouter.js"
 import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
@@ -39,8 +40,8 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Routes
 app.use('/api', authRouter);
-app.use("/api",supervisorRouter)
-app.use("/api",contractorRouter)
+app.use("/api",centeringsupervisorRouter)
+app.use("/api",centeringcontractorRouter)
 app.use("/api",centeringWorkersRouter)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)

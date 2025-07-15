@@ -59,7 +59,7 @@
 
 
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
-import Supervisor from "../models/Supervisor.js";
+import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
