@@ -215,6 +215,137 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
 
 
 
+// based on the date filter attendance
+
+// Add these new controller methods to your existing AttendanceSupervisor controller
+
+// 1. GET Attendance by Date
+export const getAttendanceByDate = async (req, res) => {
+  try {
+    const { day, month, year } = req.params;
+    
+    // Validate date components
+    if (!day || !month || !year || 
+        day.length !== 2 || month.length !== 2 || year.length !== 4) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use DD/MM/YYYY in the URL path."
+      });
+    }
+
+    const dbFormattedDate = `${year}-${month}-${day}`;
+    
+    const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+      .populate({
+        path: 'supervisorId',
+        select: '_id name email photo',
+        match: { _id: { $exists: true } }
+      })
+      .lean();
+
+    const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+    const formattedData = validRecords.map(record => ({
+      _id: record._id,
+      date: formatDate(record.date),
+      supervisor: {
+        _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
+        name: record.supervisorId.name,
+        email: record.supervisorId.email
+      },
+      status: record.status || "Not Marked"
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// 2. Apply Status to All Supervisors for a Date
+export const applyStatusToAll = async (req, res) => {
+  try {
+    const { date, status } = req.body;
+    
+    // Validate status
+    if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime, null"
+      });
+    }
+
+    // Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
+    const [day, month, year] = date.split('/');
+    if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use DD/MM/YYYY."
+      });
+    }
+
+    const dbFormattedDate = `${year}-${month}-${day}`;
+
+    // Get all supervisors
+    const supervisors = await Supervisor.find({});
+    if (supervisors.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "No supervisors found"
+      });
+    }
+
+    // Prepare bulk operations
+    const bulkOps = supervisors.map(supervisor => ({
+      updateOne: {
+        filter: { 
+          _id: supervisor._id,
+          date: dbFormattedDate 
+        },
+        update: { $set: { status } },
+        upsert: true
+      }
+    }));
+
+    // Execute bulk operation
+    const result = await SupervisorAttendance.bulkWrite(bulkOps);
+
+    // Get updated records to return
+    const updatedRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+      .populate('supervisorId', '_id name email photo')
+      .lean();
+
+    const formattedData = updatedRecords.map(record => ({
+      _id: record._id,
+      date: formatDate(record.date),
+      supervisor: {
+        _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
+        name: record.supervisorId.name,
+        email: record.supervisorId.email
+      },
+      status: record.status
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Status ${status} applied to all supervisors for ${date}`,
+      data: formattedData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
 
 
 
