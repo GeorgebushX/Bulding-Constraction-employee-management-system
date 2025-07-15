@@ -5,6 +5,8 @@ import {
   getAllAttendance,
   updateAttendanceById,
   updateStatusBySupervisorAndDate,
+  // get date today
+  getTodaySupervisorAttendance,
   // date filte
   getAttendanceByDate,
   applyStatusToAll,
@@ -22,6 +24,9 @@ router.get('/attendance', defaultAttendance, authMiddleware, getAllAttendance);
 router.put('/attendance/:id', authMiddleware, updateAttendanceById);
 router.put('/attendance/status/:supervisorId', authMiddleware, updateStatusBySupervisorAndDate);
 
+
+// getTodaySupervisorAttendance
+router.put('/attendance/today', authMiddleware, getTodaySupervisorAttendance);
 // filter by date:
 router.get('/attendance/date/:day/:month/:year',authMiddleware, getAttendanceByDate);
 router.post('/attendance/apply-to-all',authMiddleware, applyStatusToAll);
