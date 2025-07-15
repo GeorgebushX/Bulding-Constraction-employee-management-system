@@ -47,7 +47,7 @@ export const createSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, site
+      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType
     } = req.body;
 
     // Validate required fields
