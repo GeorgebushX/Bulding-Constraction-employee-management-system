@@ -57,19 +57,19 @@ import authMiddleware from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 // Salary record routes
-router.post('/supervisor/salary',authMiddleware, createSalary);
-router.get('/supervisor/salary',authMiddleware, getAllSalaries);
-router.get('/supervisor/salary/:id',authMiddleware, getSalaryById);
-router.put('/supervisor/salary/:id',authMiddleware, updateSalary);
-router.delete('/supervisor/salary/:id',authMiddleware, deleteSalaryById);
+router.post('/supervisors/salary',authMiddleware, createSalary);
+router.get('/supervisors/salary',authMiddleware, getAllSalaries);
+router.get('/supervisors/salary/:id',authMiddleware, getSalaryById);
+router.put('/supervisors/salary/:id',authMiddleware, updateSalary);
+router.delete('/supervisors/salary/:id',authMiddleware, deleteSalaryById);
 
 // Report routes
-router.get('/supervisor/reports/daily',authMiddleware, getDailySalaryReport);
-router.get('/supervisor/reports/weekly',authMiddleware, getWeeklySalaryReport);
-router.get('/supervisor/reports/monthly',authMiddleware, getMonthlySalaryReport);
-router.get('/supervisor/reports/yearly',authMiddleware, getYearlySalaryReport);
+router.get('/supervisors/reports/daily',authMiddleware, getDailySalaryReport);
+router.get('/supervisors/reports/weekly',authMiddleware, getWeeklySalaryReport);
+router.get('/supervisors/reports/monthly',authMiddleware, getMonthlySalaryReport);
+router.get('/supervisors/reports/yearly',authMiddleware, getYearlySalaryReport);
 // 
-router.get('supervisor/report/:id',authMiddleware, generateSalaryReceipt)
+router.get('supervisors/report/:id',authMiddleware, generateSalaryReceipt)
 export default router;
 
 
