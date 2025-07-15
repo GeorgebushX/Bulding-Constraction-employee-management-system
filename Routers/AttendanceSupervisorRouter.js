@@ -39,8 +39,8 @@ router.put('/attendance/:id', authMiddleware, updateAttendanceById);
 router.put('/attendance/status/:supervisorId', authMiddleware, updateStatusBySupervisorAndDate);
 
 // filter by date:
-router.get('/date/:day/:month/:year',authMiddleware, getAttendanceByDate);
-router.post('/apply-to-all',authMiddleware, applyStatusToAll);
+router.get('/attendance/date/:day/:month/:year',authMiddleware, getAttendanceByDate);
+router.post('/attendance/apply-to-all',authMiddleware, applyStatusToAll);
 
 
 // Report routes
