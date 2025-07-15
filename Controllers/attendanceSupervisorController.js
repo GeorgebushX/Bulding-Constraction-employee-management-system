@@ -374,6 +374,7 @@ export const getAttendanceByDate = async (req, res) => {
   }
 };
 
+
 // // 2. Apply Status to All Supervisors for a Date
 // export const applyStatusToAll = async (req, res) => {
 //   try {
@@ -407,36 +408,52 @@ export const getAttendanceByDate = async (req, res) => {
 //       });
 //     }
 
-//     // Prepare bulk operations
+//     // Prepare bulk operations with explicit _id setting
 //     const bulkOps = supervisors.map(supervisor => ({
 //       updateOne: {
 //         filter: { 
-//           _id: supervisor._id,
+//           supervisorId: supervisor._id,  // Changed from _id to supervisorId
 //           date: dbFormattedDate 
 //         },
-//         update: { $set: { status } },
+//         update: { 
+//           $set: { 
+//             status,
+//             _id: supervisor._id,  // Explicitly set _id
+//             supervisorId: supervisor._id,
+//             date: dbFormattedDate
+//           } 
+//         },
 //         upsert: true
 //       }
 //     }));
 
 //     // Execute bulk operation
-//     const result = await SupervisorAttendance.bulkWrite(bulkOps);
+//     await SupervisorAttendance.bulkWrite(bulkOps);
 
-//     // Get updated records to return
+//     // Get updated records with proper population and error handling
 //     const updatedRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
-//       .populate('supervisorId', '_id name email photo')
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         options: { allowNull: true }
+//       })
 //       .lean();
 
-//     const formattedData = updatedRecords.map(record => ({
+//     // Filter out any null supervisor references
+//     const validRecords = updatedRecords.filter(record => 
+//       record.supervisorId && record.supervisorId._id
+//     );
+
+//     const formattedData = validRecords.map(record => ({
 //       _id: record._id,
 //       date: formatDate(record.date),
 //       supervisor: {
 //         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo,
+//         photo: record.supervisorId.photo || null,
 //         name: record.supervisorId.name,
 //         email: record.supervisorId.email
 //       },
-//       status: record.status
+//       status: record.status || "Not Marked"
 //     }));
 
 //     res.status(200).json({
@@ -445,16 +462,15 @@ export const getAttendanceByDate = async (req, res) => {
 //       data: formattedData
 //     });
 //   } catch (error) {
+//     console.error("Error in applyStatusToAll:", error);
 //     res.status(500).json({
 //       success: false,
-//       error: error.message
+//       error: "Server error: " + error.message
 //     });
 //   }
 // };
 
 
-
-// 2. Apply Status to All Supervisors for a Date
 export const applyStatusToAll = async (req, res) => {
   try {
     const { date, status } = req.body;
@@ -487,17 +503,17 @@ export const applyStatusToAll = async (req, res) => {
       });
     }
 
-    // Prepare bulk operations with explicit _id setting
+    // Prepare bulk operations
     const bulkOps = supervisors.map(supervisor => ({
       updateOne: {
         filter: { 
-          supervisorId: supervisor._id,  // Changed from _id to supervisorId
+          supervisorId: supervisor._id,
           date: dbFormattedDate 
         },
         update: { 
           $set: { 
             status,
-            _id: supervisor._id,  // Explicitly set _id
+            _id: supervisor._id,
             supervisorId: supervisor._id,
             date: dbFormattedDate
           } 
@@ -507,9 +523,10 @@ export const applyStatusToAll = async (req, res) => {
     }));
 
     // Execute bulk operation
-    await SupervisorAttendance.bulkWrite(bulkOps);
+    const bulkResult = await SupervisorAttendance.bulkWrite(bulkOps);
+    console.log('Bulk write result:', bulkResult);
 
-    // Get updated records with proper population and error handling
+    // Get updated records with relaxed population
     const updatedRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
       .populate({
         path: 'supervisorId',
@@ -518,27 +535,39 @@ export const applyStatusToAll = async (req, res) => {
       })
       .lean();
 
-    // Filter out any null supervisor references
-    const validRecords = updatedRecords.filter(record => 
-      record.supervisorId && record.supervisorId._id
-    );
+    console.log('Updated records:', updatedRecords);
 
-    const formattedData = validRecords.map(record => ({
-      _id: record._id,
-      date: formatDate(record.date),
-      supervisor: {
+    // Format the data with more tolerant null checks
+    const formattedData = updatedRecords.map(record => {
+      const supervisorInfo = record.supervisorId ? {
         _id: record.supervisorId._id,
         photo: record.supervisorId.photo || null,
-        name: record.supervisorId.name,
-        email: record.supervisorId.email
-      },
-      status: record.status || "Not Marked"
-    }));
+        name: record.supervisorId.name || 'Unknown',
+        email: record.supervisorId.email || 'No email'
+      } : {
+        _id: record._id, // Fallback to the record's _id if no supervisor
+        photo: null,
+        name: 'Supervisor not found',
+        email: 'No email'
+      };
+
+      return {
+        _id: record._id,
+        date: formatDate(record.date),
+        supervisor: supervisorInfo,
+        status: record.status || "Not Marked"
+      };
+    });
 
     res.status(200).json({
       success: true,
       message: `Status ${status} applied to all supervisors for ${date}`,
-      data: formattedData
+      data: formattedData,
+      stats: {
+        matched: bulkResult.matchedCount,
+        modified: bulkResult.modifiedCount,
+        upserted: bulkResult.upsertedCount
+      }
     });
   } catch (error) {
     console.error("Error in applyStatusToAll:", error);
@@ -548,8 +577,6 @@ export const applyStatusToAll = async (req, res) => {
     });
   }
 };
-
-
 
 // Generate PDF Report
 const generatePDFReport = (data, periodType) => {
@@ -625,64 +652,6 @@ const generateExcelReport = (data, periodType) => {
 // Daily Report
 
 
-// export const getDailyReport = async (req, res) => {
-//   try {
-//     const { date, format = 'json' } = req.query;
-    
-//     if (!date) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Date parameter is required for daily report"
-//       });
-//     }
-
-//     const attendanceData = await SupervisorAttendance.find({ date })
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       });
-
-//     const formattedData = attendanceData.map(record => ({
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email,
-//         photo: record.supervisorId.photo
-//       },
-//       status: record.status || "Not Marked"
-//     }));
-
-//     if (format === 'pdf') {
-//       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
-//       res.setHeader('Content-Type', 'application/pdf');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.pdf`);
-//       return res.send(pdfBuffer);
-//     } else if (format === 'excel') {
-//       const workbook = generateExcelReport(formattedData, 'Daily');
-//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.xlsx`);
-//       await workbook.xlsx.write(res);
-//       return res.end();
-//     } else {
-//       return res.status(200).json({
-//         success: true,
-//         period: 'daily',
-//         date,
-//         data: formattedData
-//       });
-//     }
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
 export const getDailyReport = async (req, res) => {
   try {
     const { date, format = 'json' } = req.query;
@@ -694,57 +663,33 @@ export const getDailyReport = async (req, res) => {
       });
     }
 
-    // First validate the date format (YYYY-MM-DD)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid date format. Please use YYYY-MM-DD"
-      });
-    }
-
-    // Get all attendance records for the date
     const attendanceData = await SupervisorAttendance.find({ date })
       .populate({
         path: 'supervisorId',
         select: '_id name email photo',
-        options: { allowNull: true } // Allow null values
+        match: { _id: { $exists: true } }
       });
 
-    // Filter out records with null supervisorId or invalid references
-    const validRecords = attendanceData.filter(record => 
-      record.supervisorId && record.supervisorId._id
-    );
-
-    // Format the data
-    const formattedData = validRecords.map(record => ({
+    const formattedData = attendanceData.map(record => ({
       date: formatDate(record.date),
       supervisor: {
         _id: record.supervisorId._id,
         name: record.supervisorId.name,
         email: record.supervisorId.email,
-        photo: record.supervisorId.photo || null
+        photo: record.supervisorId.photo
       },
       status: record.status || "Not Marked"
     }));
 
-    // Handle case where no valid records were found
-    if (formattedData.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "No valid attendance records found for the specified date"
-      });
-    }
-
-    // Handle different output formats
     if (format === 'pdf') {
       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.pdf`);
       return res.send(pdfBuffer);
     } else if (format === 'excel') {
       const workbook = generateExcelReport(formattedData, 'Daily');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.xlsx`);
+      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.xlsx`);
       await workbook.xlsx.write(res);
       return res.end();
     } else {
@@ -756,13 +701,95 @@ export const getDailyReport = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error in getDailyReport:", error);
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
 };
+
+
+
+// export const getDailyReport = async (req, res) => {
+//   try {
+//     const { date, format = 'json' } = req.query;
+    
+//     if (!date) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Date parameter is required for daily report"
+//       });
+//     }
+
+//     // First validate the date format (YYYY-MM-DD)
+//     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid date format. Please use YYYY-MM-DD"
+//       });
+//     }
+
+//     // Get all attendance records for the date
+//     const attendanceData = await SupervisorAttendance.find({ date })
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         options: { allowNull: true } // Allow null values
+//       });
+
+//     // Filter out records with null supervisorId or invalid references
+//     const validRecords = attendanceData.filter(record => 
+//       record.supervisorId && record.supervisorId._id
+//     );
+
+//     // Format the data
+//     const formattedData = validRecords.map(record => ({
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email,
+//         photo: record.supervisorId.photo || null
+//       },
+//       status: record.status || "Not Marked"
+//     }));
+
+//     // Handle case where no valid records were found
+//     if (formattedData.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "No valid attendance records found for the specified date"
+//       });
+//     }
+
+//     // Handle different output formats
+//     if (format === 'pdf') {
+//       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
+//       res.setHeader('Content-Type', 'application/pdf');
+//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.pdf`);
+//       return res.send(pdfBuffer);
+//     } else if (format === 'excel') {
+//       const workbook = generateExcelReport(formattedData, 'Daily');
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       return res.status(200).json({
+//         success: true,
+//         period: 'daily',
+//         date,
+//         data: formattedData
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error in getDailyReport:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
 
 
 // Weekly Report
