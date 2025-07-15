@@ -1,41 +1,100 @@
-
+import mongoose from "mongoose";
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   // If already in DD/MM/YYYY format, return as-is
+//   if (dateString.includes('/')) {
+//     return dateString;
+//   }
+  
+//   // Convert from YYYY-MM-DD to DD/MM/YYYY
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+// const parseToDbDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   // If already in YYYY-MM-DD format, return as-is
+//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+//     return dateString;
+//   }
+  
+//   // Convert from DD/MM/YYYY to YYYY-MM-DD
+//   const [day, month, year] = dateString.split('/');
+//   return `${year}-${month}-${day}`;
+// };
+
+// // 1. GET all attendance records
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+
+// Helper function to get current date in YYYY-MM-DD format
+const getCurrentDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
   if (!dateString) return '';
-  
-  // If already in DD/MM/YYYY format, return as-is
-  if (dateString.includes('/')) {
-    return dateString;
-  }
-  
-  // Convert from YYYY-MM-DD to DD/MM/YYYY
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
-// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
-const parseToDbDate = (dateString) => {
-  if (!dateString) return '';
-  
-  // If already in YYYY-MM-DD format, return as-is
-  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-    return dateString;
-  }
-  
-  // Convert from DD/MM/YYYY to YYYY-MM-DD
-  const [day, month, year] = dateString.split('/');
-  return `${year}-${month}-${day}`;
-};
-
-// 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
   try {
-    const attendanceRecords = await SupervisorAttendance.find({})
+    const currentDate = getCurrentDate();
+
+    // Get all supervisors
+    const supervisors = await Supervisor.find({});
+    
+    // Get attendance records for current date
+    const attendanceRecords = await SupervisorAttendance.find({ date: currentDate })
       .populate({
         path: 'supervisorId',
         select: '_id name email photo',
@@ -43,19 +102,30 @@ export const getAllAttendance = async (req, res) => {
       })
       .lean();
 
-    const validRecords = attendanceRecords.filter(record => record.supervisorId);
+    // Create a map of existing attendance records by supervisorId
+    const attendanceMap = new Map();
+    attendanceRecords.forEach(record => {
+      if (record.supervisorId) {
+        attendanceMap.set(record.supervisorId._id.toString(), record);
+      }
+    });
 
-    const formattedData = validRecords.map(record => ({
-      _id: record._id,
-      date: formatDate(record.date),
-      supervisor: {
-        _id: record.supervisorId._id,
-        photo: record.supervisorId.photo,
-        name: record.supervisorId.name,
-        email: record.supervisorId.email
-      },
-      status: record.status
-    }));
+    // Prepare the final data
+    const formattedData = supervisors.map(supervisor => {
+      const existingRecord = attendanceMap.get(supervisor._id.toString());
+      
+      return {
+        _id: existingRecord?._id || new mongoose.Types.ObjectId(), // Generate new ID if no record exists
+        date: formatDate(currentDate),
+        supervisor: {
+          _id: supervisor._id,
+          photo: supervisor.photo || null,
+          name: supervisor.name,
+          email: supervisor.email
+        },
+        status: existingRecord?.status || null // Default to null if no record exists
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -68,10 +138,6 @@ export const getAllAttendance = async (req, res) => {
     });
   }
 };
-
-// [Rest of your controller methods remain the same, just ensure they use formatDate() and parseToDbDate() consistently]
-
-
 
 // 2. UPDATE Attendance by ID
 export const updateAttendanceById = async (req, res) => {
@@ -132,79 +198,201 @@ export const updateAttendanceById = async (req, res) => {
 };
 
 
+// export const updateStatusBySupervisorAndDate = async (req, res) => {
+//   try {
+//     const { supervisorId } = req.params;
+//     const { date, status } = req.body;
+
+//     // 1. Validate status
+//     if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
+//       });
+//     }
+
+//     // 2. Validate supervisorId (must be numeric)
+//     const numericSupervisorId = Number(supervisorId);
+//     if (isNaN(numericSupervisorId)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid supervisor ID format. Must be a number."
+//       });
+//     }
+
+//     // 3. Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
+//     const [day, month, year] = date.split('/');
+//     if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid date format. Use DD/MM/YYYY."
+//       });
+//     }
+
+//     const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+//     // 4. Update attendance record
+//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
+//       { 
+//         _id: numericSupervisorId,
+//         date: dbFormattedDate
+//       },
+//       { status },
+//       { 
+//         new: true,       // Return the updated document
+//         upsert: false    // Do not create if doesn't exist
+//       }
+//     ).populate('supervisorId', '_id name email photo');
+
+//     // 5. Handle record not found
+//     if (!updatedAttendance) {
+//       return res.status(404).json({
+//         success: false,
+//         error: "Attendance record not found for the given supervisor ID and date."
+//       });
+//     }
+
+//     // 6. Success response
+//     res.status(200).json({
+//       success: true,
+//       message: "Status updated successfully",
+//       data: {
+//         _id: updatedAttendance._id,
+//         date: formatDate(updatedAttendance.date), // Format back to DD/MM/YYYY
+//         supervisor: {
+//           _id: updatedAttendance.supervisorId._id,
+//           photo: updatedAttendance.supervisorId.photo,
+//           name: updatedAttendance.supervisorId.name,
+//           email: updatedAttendance.supervisorId.email
+//         },
+//         status: updatedAttendance.status
+//       }
+//     });
+
+//   } catch (error) {
+//     // 7. Server error handling
+//     console.error("Error updating attendance:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: "Server error: " + error.message
+//     });
+//   }
+// };
+
+
 export const updateStatusBySupervisorAndDate = async (req, res) => {
   try {
     const { supervisorId } = req.params;
     const { date, status } = req.body;
 
-    // 1. Validate status
-    if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
+    // 1. Validate status (including null/undefined)
+    const allowedStatuses = ["Fullday", "Halfday", "Overtime", null, undefined];
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
+        error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime or null"
       });
     }
 
-    // 2. Validate supervisorId (must be numeric)
-    const numericSupervisorId = Number(supervisorId);
-    if (isNaN(numericSupervisorId)) {
+    // 2. Validate supervisorId (must be numeric or valid MongoDB ID)
+    let supervisorIdFilter;
+    if (/^\d+$/.test(supervisorId)) {
+      supervisorIdFilter = Number(supervisorId);
+    } else if (/^[0-9a-fA-F]{24}$/.test(supervisorId)) {
+      supervisorIdFilter = supervisorId;
+    } else {
       return res.status(400).json({
         success: false,
-        error: "Invalid supervisor ID format. Must be a number."
+        error: "Invalid supervisor ID format. Must be a number or valid MongoDB ID."
       });
     }
 
-    // 3. Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
-    const [day, month, year] = date.split('/');
-    if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
+    // 3. Parse and validate date (accepts multiple formats)
+    let dbFormattedDate;
+    try {
+      // Try parsing as ISO format (YYYY-MM-DD)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        dbFormattedDate = date;
+      } 
+      // Try parsing as DD/MM/YYYY
+      else if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+        const [day, month, year] = date.split('/');
+        dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      // Try parsing as MM/DD/YYYY
+      else if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+        const [month, day, year] = date.split('/');
+        dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      // Try parsing as timestamp
+      else if (!isNaN(new Date(date).getTime())) {
+        const jsDate = new Date(date);
+        dbFormattedDate = jsDate.toISOString().split('T')[0];
+      } else {
+        throw new Error("Invalid date format");
+      }
+
+      // Validate the parsed date
+      const dateObj = new Date(dbFormattedDate);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error("Invalid date");
+      }
+    } catch (dateError) {
       return res.status(400).json({
         success: false,
-        error: "Invalid date format. Use DD/MM/YYYY."
+        error: "Invalid date format. Accepted formats: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD, or valid timestamp"
       });
     }
 
-    const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    // 4. Build update query
+    const updateData = {};
+    if (status !== undefined) {
+      updateData.status = status;
+    } else {
+      // If status is undefined, set to null (or remove the field if that's preferred)
+      updateData.status = null;
+    }
 
-    // 4. Update attendance record
+    // 5. Update or create attendance record
     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
       { 
-        _id: numericSupervisorId,
+        supervisorId: supervisorIdFilter,
         date: dbFormattedDate
       },
-      { status },
+      updateData,
       { 
         new: true,       // Return the updated document
-        upsert: false    // Do not create if doesn't exist
+        upsert: true,    // Create if doesn't exist
+        runValidators: true // Run schema validators
       }
     ).populate('supervisorId', '_id name email photo');
 
-    // 5. Handle record not found
-    if (!updatedAttendance) {
-      return res.status(404).json({
-        success: false,
-        error: "Attendance record not found for the given supervisor ID and date."
-      });
-    }
+    // 6. Format the response date (DD/MM/YYYY)
+    const responseDate = formatDateForResponse(updatedAttendance.date);
 
-    // 6. Success response
+    // 7. Success response
     res.status(200).json({
       success: true,
-      message: "Status updated successfully",
+      message: updatedAttendance.createdAt === updatedAttendance.updatedAt 
+        ? "New attendance record created" 
+        : "Existing attendance record updated",
       data: {
         _id: updatedAttendance._id,
-        date: formatDate(updatedAttendance.date), // Format back to DD/MM/YYYY
-        supervisor: {
+        date: responseDate,
+        supervisor: updatedAttendance.supervisorId ? {
           _id: updatedAttendance.supervisorId._id,
           photo: updatedAttendance.supervisorId.photo,
           name: updatedAttendance.supervisorId.name,
           email: updatedAttendance.supervisorId.email
-        },
-        status: updatedAttendance.status
+        } : null,
+        status: updatedAttendance.status,
+        createdAt: updatedAttendance.createdAt,
+        updatedAt: updatedAttendance.updatedAt
       }
     });
 
   } catch (error) {
-    // 7. Server error handling
+    // 8. Server error handling
     console.error("Error updating attendance:", error);
     res.status(500).json({
       success: false,
@@ -213,62 +401,16 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
   }
 };
 
+// Helper function to format date for response
+function formatDateForResponse(dateString) {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
 
-// based on the date filter attendance
-
-// Add these new controller methods to your existing AttendanceSupervisor controller
-
-// 1. GET Attendance by Date
-
-// export const getAttendanceByDate = async (req, res) => {
-//   try {
-//     const { day, month, year } = req.params;
-    
-//     // Validate date components
-//     if (!day || !month || !year || 
-//         day.length !== 2 || month.length !== 2 || year.length !== 4) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid date format. Use DD/MM/YYYY in the URL path."
-//       });
-//     }
-
-//     const dbFormattedDate = `${year}-${month}-${day}`;
-    
-//     const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .lean();
-
-//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
-
-//     const formattedData = validRecords.map(record => ({
-//       _id: record._id,
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email
-//       },
-//       status: record.status || "Not Marked"
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       data: formattedData
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
 
 export const getAttendanceByDate = async (req, res) => {
   try {
@@ -373,103 +515,6 @@ export const getAttendanceByDate = async (req, res) => {
     });
   }
 };
-
-
-// // 2. Apply Status to All Supervisors for a Date
-// export const applyStatusToAll = async (req, res) => {
-//   try {
-//     const { date, status } = req.body;
-    
-//     // Validate status
-//     if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime, null"
-//       });
-//     }
-
-//     // Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
-//     const [day, month, year] = date.split('/');
-//     if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid date format. Use DD/MM/YYYY."
-//       });
-//     }
-
-//     const dbFormattedDate = `${year}-${month}-${day}`;
-
-//     // Get all supervisors
-//     const supervisors = await Supervisor.find({});
-//     if (supervisors.length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         error: "No supervisors found"
-//       });
-//     }
-
-//     // Prepare bulk operations with explicit _id setting
-//     const bulkOps = supervisors.map(supervisor => ({
-//       updateOne: {
-//         filter: { 
-//           supervisorId: supervisor._id,  // Changed from _id to supervisorId
-//           date: dbFormattedDate 
-//         },
-//         update: { 
-//           $set: { 
-//             status,
-//             _id: supervisor._id,  // Explicitly set _id
-//             supervisorId: supervisor._id,
-//             date: dbFormattedDate
-//           } 
-//         },
-//         upsert: true
-//       }
-//     }));
-
-//     // Execute bulk operation
-//     await SupervisorAttendance.bulkWrite(bulkOps);
-
-//     // Get updated records with proper population and error handling
-//     const updatedRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         options: { allowNull: true }
-//       })
-//       .lean();
-
-//     // Filter out any null supervisor references
-//     const validRecords = updatedRecords.filter(record => 
-//       record.supervisorId && record.supervisorId._id
-//     );
-
-//     const formattedData = validRecords.map(record => ({
-//       _id: record._id,
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo || null,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email
-//       },
-//       status: record.status || "Not Marked"
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       message: `Status ${status} applied to all supervisors for ${date}`,
-//       data: formattedData
-//     });
-//   } catch (error) {
-//     console.error("Error in applyStatusToAll:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: "Server error: " + error.message
-//     });
-//   }
-// };
-
 
 export const applyStatusToAll = async (req, res) => {
   try {
@@ -707,89 +752,6 @@ export const getDailyReport = async (req, res) => {
     });
   }
 };
-
-
-
-// export const getDailyReport = async (req, res) => {
-//   try {
-//     const { date, format = 'json' } = req.query;
-    
-//     if (!date) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Date parameter is required for daily report"
-//       });
-//     }
-
-//     // First validate the date format (YYYY-MM-DD)
-//     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid date format. Please use YYYY-MM-DD"
-//       });
-//     }
-
-//     // Get all attendance records for the date
-//     const attendanceData = await SupervisorAttendance.find({ date })
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         options: { allowNull: true } // Allow null values
-//       });
-
-//     // Filter out records with null supervisorId or invalid references
-//     const validRecords = attendanceData.filter(record => 
-//       record.supervisorId && record.supervisorId._id
-//     );
-
-//     // Format the data
-//     const formattedData = validRecords.map(record => ({
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email,
-//         photo: record.supervisorId.photo || null
-//       },
-//       status: record.status || "Not Marked"
-//     }));
-
-//     // Handle case where no valid records were found
-//     if (formattedData.length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         error: "No valid attendance records found for the specified date"
-//       });
-//     }
-
-//     // Handle different output formats
-//     if (format === 'pdf') {
-//       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
-//       res.setHeader('Content-Type', 'application/pdf');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.pdf`);
-//       return res.send(pdfBuffer);
-//     } else if (format === 'excel') {
-//       const workbook = generateExcelReport(formattedData, 'Daily');
-//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.xlsx`);
-//       await workbook.xlsx.write(res);
-//       return res.end();
-//     } else {
-//       return res.status(200).json({
-//         success: true,
-//         period: 'daily',
-//         date,
-//         data: formattedData
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error in getDailyReport:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
 
 
 // Weekly Report
