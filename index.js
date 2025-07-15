@@ -26,6 +26,8 @@ import plumbersupervisorRouter from "././Routers/supervisor/plumberSupervisorRou
 import electriciansupervisorRouter from "././Routers/supervisor/electricianSupervisorRouter.js"
 import tilessupervisorRouter from "././Routers/supervisor/tilesSupervisorRouter.js"
 
+import supervisorRouter from "./Routers/SupervisorRouter.js"
+
 import centeringcontractorRouter from "./Routers/contractorRouter.js"
 import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
@@ -57,6 +59,9 @@ app.use("/api",carpentersupervisorRouter)
 app.use("/api",plumbersupervisorRouter)
 app.use("/api",electriciansupervisorRouter)
 app.use("/api",tilessupervisorRouter)
+
+app.use("/api",supervisorRouter)
+
 
 app.use("/api",centeringcontractorRouter)
 app.use("/api",centeringWorkersRouter)
