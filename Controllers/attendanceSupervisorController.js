@@ -220,6 +220,56 @@ export const updateStatusBySupervisorAndDate = async (req, res) => {
 // Add these new controller methods to your existing AttendanceSupervisor controller
 
 // 1. GET Attendance by Date
+
+// export const getAttendanceByDate = async (req, res) => {
+//   try {
+//     const { day, month, year } = req.params;
+    
+//     // Validate date components
+//     if (!day || !month || !year || 
+//         day.length !== 2 || month.length !== 2 || year.length !== 4) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid date format. Use DD/MM/YYYY in the URL path."
+//       });
+//     }
+
+//     const dbFormattedDate = `${year}-${month}-${day}`;
+    
+//     const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status || "Not Marked"
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
 export const getAttendanceByDate = async (req, res) => {
   try {
     const { day, month, year } = req.params;
@@ -234,23 +284,77 @@ export const getAttendanceByDate = async (req, res) => {
     }
 
     const dbFormattedDate = `${year}-${month}-${day}`;
+    console.log(`Searching for date: ${dbFormattedDate}`); // Debug log
     
+    // First check if any supervisors exist
+    const supervisors = await Supervisor.find({});
+    if (supervisors.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No supervisors exist in the system",
+        data: []
+      });
+    }
+
+    // Find attendance records
     const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
       .populate({
         path: 'supervisorId',
         select: '_id name email photo',
-        match: { _id: { $exists: true } }
+        options: { allowNull: true }
       })
       .lean();
 
-    const validRecords = attendanceRecords.filter(record => record.supervisorId);
+    console.log(`Found ${attendanceRecords.length} records`); // Debug log
+
+    // If no records exist, create default ones
+    if (attendanceRecords.length === 0) {
+      console.log("No records found, creating default entries");
+      
+      const defaultRecords = supervisors.map(supervisor => ({
+        _id: supervisor._id, // Set _id to supervisorId
+        date: dbFormattedDate,
+        supervisorId: supervisor._id,
+        status: null
+      }));
+
+      await SupervisorAttendance.insertMany(defaultRecords);
+      
+      // Return the newly created default records
+      const newRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+        .populate('supervisorId', '_id name email photo')
+        .lean();
+
+      const formattedData = newRecords.map(record => ({
+        _id: record._id,
+        date: formatDate(record.date),
+        supervisor: {
+          _id: record.supervisorId._id,
+          photo: record.supervisorId.photo || null,
+          name: record.supervisorId.name,
+          email: record.supervisorId.email
+        },
+        status: record.status || "Not Marked"
+      }));
+
+      return res.status(200).json({
+        success: true,
+        message: "Default attendance records created",
+        data: formattedData
+      });
+    }
+
+    // Filter out any records with invalid supervisor references
+    const validRecords = attendanceRecords.filter(record => 
+      record.supervisorId && record.supervisorId._id
+    );
 
     const formattedData = validRecords.map(record => ({
       _id: record._id,
       date: formatDate(record.date),
       supervisor: {
         _id: record.supervisorId._id,
-        photo: record.supervisorId.photo,
+        photo: record.supervisorId.photo || null,
         name: record.supervisorId.name,
         email: record.supervisorId.email
       },
@@ -262,14 +366,13 @@ export const getAttendanceByDate = async (req, res) => {
       data: formattedData
     });
   } catch (error) {
+    console.error("Error in getAttendanceByDate:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: "Server error: " + error.message
     });
   }
 };
-
-
 
 // // 2. Apply Status to All Supervisors for a Date
 // export const applyStatusToAll = async (req, res) => {
@@ -513,7 +616,73 @@ const generateExcelReport = (data, periodType) => {
   return workbook;
 };
 
+
+
+
+
+
+
 // Daily Report
+
+
+// export const getDailyReport = async (req, res) => {
+//   try {
+//     const { date, format = 'json' } = req.query;
+    
+//     if (!date) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Date parameter is required for daily report"
+//       });
+//     }
+
+//     const attendanceData = await SupervisorAttendance.find({ date })
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       });
+
+//     const formattedData = attendanceData.map(record => ({
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email,
+//         photo: record.supervisorId.photo
+//       },
+//       status: record.status || "Not Marked"
+//     }));
+
+//     if (format === 'pdf') {
+//       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
+//       res.setHeader('Content-Type', 'application/pdf');
+//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.pdf`);
+//       return res.send(pdfBuffer);
+//     } else if (format === 'excel') {
+//       const workbook = generateExcelReport(formattedData, 'Daily');
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       return res.status(200).json({
+//         success: true,
+//         period: 'daily',
+//         date,
+//         data: formattedData
+//       });
+//     }
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
 export const getDailyReport = async (req, res) => {
   try {
     const { date, format = 'json' } = req.query;
@@ -525,33 +694,57 @@ export const getDailyReport = async (req, res) => {
       });
     }
 
+    // First validate the date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Please use YYYY-MM-DD"
+      });
+    }
+
+    // Get all attendance records for the date
     const attendanceData = await SupervisorAttendance.find({ date })
       .populate({
         path: 'supervisorId',
         select: '_id name email photo',
-        match: { _id: { $exists: true } }
+        options: { allowNull: true } // Allow null values
       });
 
-    const formattedData = attendanceData.map(record => ({
+    // Filter out records with null supervisorId or invalid references
+    const validRecords = attendanceData.filter(record => 
+      record.supervisorId && record.supervisorId._id
+    );
+
+    // Format the data
+    const formattedData = validRecords.map(record => ({
       date: formatDate(record.date),
       supervisor: {
         _id: record.supervisorId._id,
         name: record.supervisorId.name,
         email: record.supervisorId.email,
-        photo: record.supervisorId.photo
+        photo: record.supervisorId.photo || null
       },
       status: record.status || "Not Marked"
     }));
 
+    // Handle case where no valid records were found
+    if (formattedData.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "No valid attendance records found for the specified date"
+      });
+    }
+
+    // Handle different output formats
     if (format === 'pdf') {
       const pdfBuffer = await generatePDFReport(formattedData, 'Daily');
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.pdf`);
       return res.send(pdfBuffer);
     } else if (format === 'excel') {
       const workbook = generateExcelReport(formattedData, 'Daily');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report.xlsx`);
+      res.setHeader('Content-Disposition', `attachment; filename=attendance_daily_report_${date}.xlsx`);
       await workbook.xlsx.write(res);
       return res.end();
     } else {
@@ -563,12 +756,14 @@ export const getDailyReport = async (req, res) => {
       });
     }
   } catch (error) {
+    console.error("Error in getDailyReport:", error);
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
 };
+
 
 // Weekly Report
 export const getWeeklyReport = async (req, res) => {
