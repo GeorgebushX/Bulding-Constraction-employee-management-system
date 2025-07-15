@@ -45,7 +45,7 @@ const supervisorSchema = new mongoose.Schema({
       'Electrician Supervisor', 
       'Painter Supervisor', 
       'Tiles Supervisor'
-    ],default: "Centering Supervisor"
+    ],default: "Plumber Supervisor"
   },
   joiningDate: { 
     type: String,
@@ -100,5 +100,5 @@ supervisorSchema.pre('save', function(next) {
   next();
 });
 
-const Supervisor = mongoose.model('CenteringSupervisor', supervisorSchema);
+const Supervisor = mongoose.model('PlumberSupervisor', supervisorSchema);
 export default Supervisor;
