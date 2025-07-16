@@ -132,7 +132,93 @@ export const updateAttendanceById = async (req, res) => {
 
 
 
-// domy datas with records:
+// // domy datas with records:
+// export const getTodaySupervisorAttendance = async (req, res) => {
+//   try {
+//     // Get today's date in proper format
+//     const today = new Date();
+//     const todayFormatted = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+//     // Get all supervisors
+//     const supervisors = await Supervisor.find({})
+//       .select('_id name email photo')
+//       .lean();
+
+//     if (supervisors.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No supervisors found in the system",
+//         data: []
+//       });
+//     }
+
+//     // Get existing attendance records for today
+//     const existingRecords = await SupervisorAttendance.find({
+//       date: todayFormatted
+//     })
+//     .populate('supervisorId', '_id name email photo')
+//     .lean();
+
+//     // Create a map for quick lookup
+//     const attendanceMap = new Map();
+//     existingRecords.forEach(record => {
+//       if (record.supervisorId) {
+//         attendanceMap.set(record.supervisorId._id.toString(), record);
+//       }
+//     });
+
+//     // Prepare response data - ensure all supervisors are included
+//     const responseData = supervisors.map(supervisor => {
+//       const existingRecord = attendanceMap.get(supervisor._id.toString());
+      
+//       if (existingRecord) {
+//         return {
+//           _id: existingRecord._id,
+//           date: formatDate(existingRecord.date),
+//           supervisor: {
+//             _id: supervisor._id,
+//             photo: supervisor.photo,
+//             name: supervisor.name,
+//             email: supervisor.email
+//           },
+//           status: existingRecord.status,
+//           recordExists: true
+//         };
+//       } else {
+//         return {
+//           _id: null, // No record exists yet
+//           date: formatDate(todayFormatted),
+//           supervisor: {
+//             _id: supervisor._id,
+//             photo: supervisor.photo,
+//             name: supervisor.name,
+//             email: supervisor.email
+//           },
+//           status: null, // Default status is null
+//           recordExists: false
+//         };
+//       }
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Today's attendance records fetched successfully",
+//       currentDate: formatDate(todayFormatted),
+//       data: responseData
+//     });
+
+//   } catch (error) {
+//     console.error("Error fetching today's supervisor attendance:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: "Server error: " + error.message
+//     });
+//   }
+// };
+
+
+
+
 export const getTodaySupervisorAttendance = async (req, res) => {
   try {
     // Get today's date in proper format
@@ -152,25 +238,21 @@ export const getTodaySupervisorAttendance = async (req, res) => {
       });
     }
 
-    // Get existing attendance records for today
+    // Get existing attendance records for today only
     const existingRecords = await SupervisorAttendance.find({
       date: todayFormatted
     })
     .populate('supervisorId', '_id name email photo')
     .lean();
 
-    // Create a map for quick lookup
-    const attendanceMap = new Map();
-    existingRecords.forEach(record => {
-      if (record.supervisorId) {
-        attendanceMap.set(record.supervisorId._id.toString(), record);
-      }
-    });
-
-    // Prepare response data - ensure all supervisors are included
+    // Prepare response data - only for today with null status if no record exists
     const responseData = supervisors.map(supervisor => {
-      const existingRecord = attendanceMap.get(supervisor._id.toString());
-      
+      // Find if this supervisor has an existing record for today
+      const existingRecord = existingRecords.find(record => 
+        record.supervisorId?._id.toString() === supervisor._id.toString()
+      );
+
+      // For today's date, always return status as null if no record exists
       if (existingRecord) {
         return {
           _id: existingRecord._id,
@@ -186,7 +268,7 @@ export const getTodaySupervisorAttendance = async (req, res) => {
         };
       } else {
         return {
-          _id: null, // No record exists yet
+          _id: null,
           date: formatDate(todayFormatted),
           supervisor: {
             _id: supervisor._id,
@@ -194,7 +276,7 @@ export const getTodaySupervisorAttendance = async (req, res) => {
             name: supervisor.name,
             email: supervisor.email
           },
-          status: null, // Default status is null
+          status: null, // Always null for today if no record exists
           recordExists: false
         };
       }
@@ -215,9 +297,6 @@ export const getTodaySupervisorAttendance = async (req, res) => {
     });
   }
 };
-
-
-
 
 
 
