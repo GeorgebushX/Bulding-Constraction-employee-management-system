@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import cron from 'node-cron';
 import SupervisorAttendance from "../models/AttendanceSupervisor.js";
 import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
@@ -71,6 +72,101 @@ export const getAllAttendance = async (req, res) => {
 
 
 
+// latest one:
+
+const getFormattedDate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+//   if (dateString.includes('/')) return dateString;
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// CRON JOB: Create attendance for tomorrow
+cron.schedule('0 0 * * *', async () => {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = getFormattedDate(tomorrow);
+
+    const supervisors = await Supervisor.find({}).lean();
+    if (!supervisors.length) return;
+
+    const exists = await SupervisorAttendance.countDocuments({ date: dateStr });
+    if (exists > 0) return;
+
+    for (const supervisor of supervisors) {
+      const newEntry = new SupervisorAttendance({
+        date: dateStr,
+        supervisorId: supervisor._id,
+        status: null
+      });
+      await newEntry.save();
+    }
+
+    console.log(`✅ Created attendance for ${dateStr}`);
+  } catch (err) {
+    console.error("❌ Cron error:", err.message);
+  }
+});
+
+// GET today’s attendance (fallback creation)
+export const getAttendance = async (req, res) => {
+  try {
+    const today = new Date();
+    const todayFormatted = getFormattedDate(today);
+
+    const supervisors = await Supervisor.find({}).lean();
+    if (!supervisors.length) {
+      return res.status(200).json({ success: true, message: "No supervisors found.", data: [] });
+    }
+
+    let records = await SupervisorAttendance.find({ date: todayFormatted });
+    if (records.length === 0) {
+      for (const supervisor of supervisors) {
+        const newEntry = new SupervisorAttendance({
+          date: todayFormatted,
+          supervisorId: supervisor._id,
+          status: null
+        });
+        await newEntry.save();
+      }
+    }
+
+    // Re-fetch after fallback creation
+    records = await SupervisorAttendance.find({ date: todayFormatted })
+      .populate({ path: 'supervisorId', select: '_id name email photo' })
+      .lean();
+
+    const validRecords = records.filter(r => r.supervisorId);
+
+    const data = validRecords.map(r => ({
+      _id: r._id,
+      date: formatDate(r.date),
+      supervisor: {
+        _id: r.supervisorId._id,
+        name: r.supervisorId.name,
+        email: r.supervisorId.email,
+        photo: r.supervisorId.photo
+      },
+      status: r.status
+    }));
+
+    res.status(200).json({
+      success: true,
+      currentDate: formatDate(todayFormatted),
+      data
+    });
+
+  } catch (error) {
+    console.error("Error in getAttendance:", error);
+    res.status(500).json({ success: false, error: "Server error: " + error.message });
+  }
+};
+
+
+
 // 2. UPDATE Attendance by ID
 export const updateAttendanceById = async (req, res) => {
   try {
@@ -128,93 +224,6 @@ export const updateAttendanceById = async (req, res) => {
     });
   }
 };
-
-
-
-
-// // domy datas with records:
-// export const getTodaySupervisorAttendance = async (req, res) => {
-//   try {
-//     // Get today's date in proper format
-//     const today = new Date();
-//     const todayFormatted = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-    
-//     // Get all supervisors
-//     const supervisors = await Supervisor.find({})
-//       .select('_id name email photo')
-//       .lean();
-
-//     if (supervisors.length === 0) {
-//       return res.status(200).json({
-//         success: true,
-//         message: "No supervisors found in the system",
-//         data: []
-//       });
-//     }
-
-//     // Get existing attendance records for today
-//     const existingRecords = await SupervisorAttendance.find({
-//       date: todayFormatted
-//     })
-//     .populate('supervisorId', '_id name email photo')
-//     .lean();
-
-//     // Create a map for quick lookup
-//     const attendanceMap = new Map();
-//     existingRecords.forEach(record => {
-//       if (record.supervisorId) {
-//         attendanceMap.set(record.supervisorId._id.toString(), record);
-//       }
-//     });
-
-//     // Prepare response data - ensure all supervisors are included
-//     const responseData = supervisors.map(supervisor => {
-//       const existingRecord = attendanceMap.get(supervisor._id.toString());
-      
-//       if (existingRecord) {
-//         return {
-//           _id: existingRecord._id,
-//           date: formatDate(existingRecord.date),
-//           supervisor: {
-//             _id: supervisor._id,
-//             photo: supervisor.photo,
-//             name: supervisor.name,
-//             email: supervisor.email
-//           },
-//           status: existingRecord.status,
-//           recordExists: true
-//         };
-//       } else {
-//         return {
-//           _id: null, // No record exists yet
-//           date: formatDate(todayFormatted),
-//           supervisor: {
-//             _id: supervisor._id,
-//             photo: supervisor.photo,
-//             name: supervisor.name,
-//             email: supervisor.email
-//           },
-//           status: null, // Default status is null
-//           recordExists: false
-//         };
-//       }
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Today's attendance records fetched successfully",
-//       currentDate: formatDate(todayFormatted),
-//       data: responseData
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching today's supervisor attendance:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: "Server error: " + error.message
-//     });
-//   }
-// };
 
 
 
@@ -297,89 +306,6 @@ export const getTodaySupervisorAttendance = async (req, res) => {
     });
   }
 };
-
-
-
-// export const updateStatusBySupervisorAndDate = async (req, res) => {
-//   try {
-//     const { supervisorId } = req.params;
-//     const { date, status } = req.body;
-
-//     // 1. Validate status
-//     if (!["Fullday", "Halfday", "Overtime", null].includes(status)) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid status value. Allowed values: Fullday, Halfday, Overtime,null"
-//       });
-//     }
-
-//     // 2. Validate supervisorId (must be numeric)
-//     const numericSupervisorId = Number(supervisorId);
-//     if (isNaN(numericSupervisorId)) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid supervisor ID format. Must be a number."
-//       });
-//     }
-
-//     // 3. Parse and format date (DD/MM/YYYY → YYYY-MM-DD)
-//     const [day, month, year] = date.split('/');
-//     if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
-//       return res.status(400).json({
-//         success: false,
-//         error: "Invalid date format. Use DD/MM/YYYY."
-//       });
-//     }
-
-//     const dbFormattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-//     // 4. Update attendance record
-//     const updatedAttendance = await SupervisorAttendance.findOneAndUpdate(
-//       { 
-//         _id: numericSupervisorId,
-//         date: dbFormattedDate
-//       },
-//       { status },
-//       { 
-//         new: true,       // Return the updated document
-//         upsert: false    // Do not create if doesn't exist
-//       }
-//     ).populate('supervisorId', '_id name email photo');
-
-//     // 5. Handle record not found
-//     if (!updatedAttendance) {
-//       return res.status(404).json({
-//         success: false,
-//         error: "Attendance record not found for the given supervisor ID and date."
-//       });
-//     }
-
-//     // 6. Success response
-//     res.status(200).json({
-//       success: true,
-//       message: "Status updated successfully",
-//       data: {
-//         _id: updatedAttendance._id,
-//         date: formatDate(updatedAttendance.date), // Format back to DD/MM/YYYY
-//         supervisor: {
-//           _id: updatedAttendance.supervisorId._id,
-//           photo: updatedAttendance.supervisorId.photo,
-//           name: updatedAttendance.supervisorId.name,
-//           email: updatedAttendance.supervisorId.email
-//         },
-//         status: updatedAttendance.status
-//       }
-//     });
-
-//   } catch (error) {
-//     // 7. Server error handling
-//     console.error("Error updating attendance:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: "Server error: " + error.message
-//     });
-//   }
-// };
 
 
 export const updateStatusBySupervisorAndDate = async (req, res) => {
@@ -514,101 +440,179 @@ function formatDateForResponse(dateString) {
 
 
 
+
+
+
+
+
+
+
+
+
+// export const getAttendanceByDate = async (req, res) => {
+//   try {
+//     const { day, month, year } = req.params;
+    
+//     // Validate date components
+//     if (!day || !month || !year || 
+//         day.length !== 2 || month.length !== 2 || year.length !== 4) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Invalid date format. Use DD/MM/YYYY in the URL path."
+//       });
+//     }
+
+//     const dbFormattedDate = `${year}-${month}-${day}`;
+//     console.log(`Searching for date: ${dbFormattedDate}`); // Debug log
+    
+//     // First check if any supervisors exist
+//     const supervisors = await Supervisor.find({});
+//     if (supervisors.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No supervisors exist in the system",
+//         data: []
+//       });
+//     }
+
+//     // Find attendance records
+//     const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         options: { allowNull: true }
+//       })
+//       .lean();
+
+//     console.log(`Found ${attendanceRecords.length} records`); // Debug log
+
+//     // If no records exist, create default ones
+//     if (attendanceRecords.length === 0) {
+//       console.log("No records found, creating default entries");
+      
+//       const defaultRecords = supervisors.map(supervisor => ({
+//         _id: supervisor._id, // Set _id to supervisorId
+//         date: dbFormattedDate,
+//         supervisorId: supervisor._id,
+//         status: null
+//       }));
+
+//       await SupervisorAttendance.insertMany(defaultRecords);
+      
+//       // Return the newly created default records
+//       const newRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
+//         .populate('supervisorId', '_id name email photo')
+//         .lean();
+
+//       const formattedData = newRecords.map(record => ({
+//         _id: record._id,
+//         date: formatDate(record.date),
+//         supervisor: {
+//           _id: record.supervisorId._id,
+//           photo: record.supervisorId.photo || null,
+//           name: record.supervisorId.name,
+//           email: record.supervisorId.email
+//         },
+//         status: record.status || "Not Marked"
+//       }));
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Default attendance records created",
+//         data: formattedData
+//       });
+//     }
+
+//     // Filter out any records with invalid supervisor references
+//     const validRecords = attendanceRecords.filter(record => 
+//       record.supervisorId && record.supervisorId._id
+//     );
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo || null,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status || "Not Marked"
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     console.error("Error in getAttendanceByDate:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: "Server error: " + error.message
+//     });
+//   }
+// };
+
+// Format date as DD/MM/YYYY
+// const formatDate = (inputDate) => {
+//   const date = new Date(inputDate);
+//   const day = String(date.getDate()).padStart(2, '0');
+//   const month = String(date.getMonth() + 1).padStart(2, '0');
+//   const year = date.getFullYear();
+//   return `${day}/${month}/${year}`;
+// };
+
 export const getAttendanceByDate = async (req, res) => {
   try {
     const { day, month, year } = req.params;
-    
-    // Validate date components
-    if (!day || !month || !year || 
-        day.length !== 2 || month.length !== 2 || year.length !== 4) {
+
+    // Validate format
+    if (!day || !month || !year || day.length !== 2 || month.length !== 2 || year.length !== 4) {
       return res.status(400).json({
         success: false,
         error: "Invalid date format. Use DD/MM/YYYY in the URL path."
       });
     }
 
-    const dbFormattedDate = `${year}-${month}-${day}`;
-    console.log(`Searching for date: ${dbFormattedDate}`); // Debug log
-    
-    // First check if any supervisors exist
-    const supervisors = await Supervisor.find({});
-    if (supervisors.length === 0) {
+    const dbFormattedDate = `${year}-${month}-${day}`; // YYYY-MM-DD
+
+    // Fetch attendance for the given date
+    const attendanceRecords = await AttendanceSupervisor.find({ date: dbFormattedDate })
+      .populate('supervisorId', '_id name email photo')
+      .lean();
+
+    // If no records exist for that date, return empty list
+    if (attendanceRecords.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "No supervisors exist in the system",
+        message: "No attendance records found for this date.",
+        date: formatDate(dbFormattedDate),
         data: []
       });
     }
 
-    // Find attendance records
-    const attendanceRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
-      .populate({
-        path: 'supervisorId',
-        select: '_id name email photo',
-        options: { allowNull: true }
-      })
-      .lean();
-
-    console.log(`Found ${attendanceRecords.length} records`); // Debug log
-
-    // If no records exist, create default ones
-    if (attendanceRecords.length === 0) {
-      console.log("No records found, creating default entries");
-      
-      const defaultRecords = supervisors.map(supervisor => ({
-        _id: supervisor._id, // Set _id to supervisorId
-        date: dbFormattedDate,
-        supervisorId: supervisor._id,
-        status: null
-      }));
-
-      await SupervisorAttendance.insertMany(defaultRecords);
-      
-      // Return the newly created default records
-      const newRecords = await SupervisorAttendance.find({ date: dbFormattedDate })
-        .populate('supervisorId', '_id name email photo')
-        .lean();
-
-      const formattedData = newRecords.map(record => ({
+    // Format output
+    const formattedData = attendanceRecords
+      .filter(record => record.supervisorId)
+      .map(record => ({
         _id: record._id,
         date: formatDate(record.date),
         supervisor: {
           _id: record.supervisorId._id,
-          photo: record.supervisorId.photo || null,
           name: record.supervisorId.name,
-          email: record.supervisorId.email
+          email: record.supervisorId.email,
+          photo: record.supervisorId.photo || null
         },
         status: record.status || "Not Marked"
       }));
 
-      return res.status(200).json({
-        success: true,
-        message: "Default attendance records created",
-        data: formattedData
-      });
-    }
-
-    // Filter out any records with invalid supervisor references
-    const validRecords = attendanceRecords.filter(record => 
-      record.supervisorId && record.supervisorId._id
-    );
-
-    const formattedData = validRecords.map(record => ({
-      _id: record._id,
-      date: formatDate(record.date),
-      supervisor: {
-        _id: record.supervisorId._id,
-        photo: record.supervisorId.photo || null,
-        name: record.supervisorId.name,
-        email: record.supervisorId.email
-      },
-      status: record.status || "Not Marked"
-    }));
-
     res.status(200).json({
       success: true,
+      message: "Attendance records fetched successfully.",
+      date: formatDate(dbFormattedDate),
       data: formattedData
     });
+
   } catch (error) {
     console.error("Error in getAttendanceByDate:", error);
     res.status(500).json({
@@ -617,6 +621,9 @@ export const getAttendanceByDate = async (req, res) => {
     });
   }
 };
+
+
+
 
 export const applyStatusToAll = async (req, res) => {
   try {
@@ -724,6 +731,10 @@ export const applyStatusToAll = async (req, res) => {
     });
   }
 };
+
+
+
+
 
 // Generate PDF Report
 const generatePDFReport = (data, periodType) => {
