@@ -28,4 +28,4 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     next();
 });
 
-export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);
+export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);      

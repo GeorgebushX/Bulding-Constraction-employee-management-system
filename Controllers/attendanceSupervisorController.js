@@ -33,42 +33,42 @@ import pdfkit from 'pdfkit';
 //   return `${year}-${month}-${day}`;
 // };
 
-// 1. GET all attendance records
-export const getAllAttendance = async (req, res) => {
-  try {
-    const attendanceRecords = await SupervisorAttendance.find({})
-      .populate({
-        path: 'supervisorId',
-        select: '_id name email photo',
-        match: { _id: { $exists: true } }
-      })
-      .lean();
+// // 1. GET all attendance records
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
 
-    const validRecords = attendanceRecords.filter(record => record.supervisorId);
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
 
-    const formattedData = validRecords.map(record => ({
-      _id: record._id,
-      date: formatDate(record.date),
-      supervisor: {
-        _id: record.supervisorId._id,
-        photo: record.supervisorId.photo,
-        name: record.supervisorId.name,
-        email: record.supervisorId.email
-      },
-      status: record.status
-    }));
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
 
-    res.status(200).json({
-      success: true,
-      data: formattedData
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
 
 
 
