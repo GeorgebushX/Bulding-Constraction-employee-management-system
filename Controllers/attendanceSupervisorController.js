@@ -117,7 +117,14 @@ export const getAttendance = async (req, res) => {
     const today = new Date();
     const todayFormatted = getFormattedDate(today);
 
-    const supervisors = await Supervisor.find({}).lean();
+    const supervisors = await Supervisor.find({})
+    .populate({
+        path: 'supervisorId',
+        select: '_id name email photo',
+        match: { _id: { $exists: true } }
+      })
+      .lean();
+
     if (!supervisors.length) {
       return res.status(200).json({ success: true, message: "No supervisors found.", data: [] });
     }
