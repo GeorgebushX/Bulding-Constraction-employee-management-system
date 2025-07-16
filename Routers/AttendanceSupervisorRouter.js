@@ -27,7 +27,7 @@ router.get('/attendance', defaultAttendance, authMiddleware, getAttendance);
 router.put('/attendance/:id', authMiddleware, updateAttendanceById);
 router.put('/attendance/status/:supervisorId', authMiddleware, updateStatusBySupervisorAndDate);
 
-// getTodaySupervisorAttendance
+// getTodaySupervisorAttendance     
 router.get('/attendance/today', authMiddleware, getTodaySupervisorAttendance);
 // filter by date:
 router.get('/attendance/date/:day/:month/:year',authMiddleware, getAttendanceByDate);

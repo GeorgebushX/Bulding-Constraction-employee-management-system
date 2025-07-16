@@ -72,105 +72,219 @@ import pdfkit from 'pdfkit';
 
 
 
-// latest one:
-
-const getFormattedDate = (dateObj) => dateObj.toISOString().split('T')[0];
-
-const formatDate = (dateString) => {
+const formatDisplayDate = (dateString) => {
   if (!dateString) return '';
-  if (dateString.includes('/')) return dateString;
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
-// CRON JOB: Create attendance for tomorrow
+const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+// CRON JOB
 cron.schedule('0 0 * * *', async () => {
   try {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = getFormattedDate(tomorrow);
+    const dateStr = getISODate(tomorrow);
 
-    const supervisors = await Supervisor.find({}).lean();
+    const supervisors = await Supervisor.find({});
     if (!supervisors.length) return;
 
-    const exists = await SupervisorAttendance.countDocuments({ date: dateStr });
-    if (exists > 0) return;
+    const exists = await SupervisorAttendance.exists({ date: dateStr });
+    if (exists) return;
 
-    for (const supervisor of supervisors) {
-      const newEntry = new SupervisorAttendance({
-        date: dateStr,
-        supervisorId: supervisor._id,
-        status: null
-      });
-      await newEntry.save();
-    }
+    const bulkOps = supervisors.map(supervisor => ({
+      insertOne: {
+        document: {
+          date: dateStr,
+          supervisorId: supervisor._id,
+          status: null
+        }
+      }
+    }));
 
+    await SupervisorAttendance.bulkWrite(bulkOps);
     console.log(`✅ Created attendance for ${dateStr}`);
   } catch (err) {
     console.error("❌ Cron error:", err.message);
   }
 });
 
-// GET today’s attendance (fallback creation)
+// GET today's attendance
 export const getAttendance = async (req, res) => {
   try {
     const today = new Date();
-    const todayFormatted = getFormattedDate(today);
+    const todayISODate = getISODate(today);
 
-    const supervisors = await Supervisor.find({})
-    .populate({
-        path: 'supervisorId',
-        select: '_id name email photo',
-        match: { _id: { $exists: true } }
-      })
-      .lean();
-
-    if (!supervisors.length) {
-      return res.status(200).json({ success: true, message: "No supervisors found.", data: [] });
-    }
-
-    let records = await SupervisorAttendance.find({ date: todayFormatted });
-    if (records.length === 0) {
-      for (const supervisor of supervisors) {
-        const newEntry = new SupervisorAttendance({
-          date: todayFormatted,
-          supervisorId: supervisor._id,
-          status: null
-        });
-        await newEntry.save();
+    // Check if records exist for today
+    let recordsExist = await SupervisorAttendance.exists({ date: todayISODate });
+    
+    // Create records if they don't exist
+    if (!recordsExist) {
+      const supervisors = await Supervisor.find({});
+      
+      if (supervisors.length > 0) {
+        const bulkOps = supervisors.map(supervisor => ({
+          insertOne: {
+            document: {
+              date: todayISODate,
+              supervisorId: supervisor._id,
+              status: null
+            }
+          }
+        }));
+        
+        await SupervisorAttendance.bulkWrite(bulkOps);
       }
     }
 
-    // Re-fetch after fallback creation
-    records = await SupervisorAttendance.find({ date: todayFormatted })
-      .populate({ path: 'supervisorId', select: '_id name email photo' })
-      .lean();
-
-    const validRecords = records.filter(r => r.supervisorId);
-
-    const data = validRecords.map(r => ({
-      _id: r._id,
-      date: formatDate(r.date),
-      supervisor: {
-        _id: r.supervisorId._id,
-        name: r.supervisorId.name,
-        email: r.supervisorId.email,
-        photo: r.supervisorId.photo
+    // Fetch records with aggregation for better performance
+    const records = await SupervisorAttendance.aggregate([
+      { $match: { date: todayISODate } },
+      {
+        $lookup: {
+          from: 'centeringSupervisors', // Make sure this matches your Supervisor collection name
+          localField: 'supervisorId',
+          foreignField: '_id',
+          as: 'supervisor'
+        }
       },
-      status: r.status
-    }));
+      { $unwind: '$supervisor' },
+      {
+        $project: {
+          _id: 1,
+          date: 1,
+          status: 1,
+          supervisor: {
+            _id: '$supervisor._id',
+            name: '$supervisor.name',
+            email: '$supervisor.email',
+            photo: '$supervisor.photo'
+          }
+        }
+      }
+    ]);
 
-    res.status(200).json({
+    // Format response
+    const response = {
       success: true,
-      currentDate: formatDate(todayFormatted),
-      data
-    });
+      currentDate: formatDisplayDate(todayISODate),
+      data: records.map(record => ({
+        ...record,
+        date: formatDisplayDate(record.date)
+      }))
+    };
+
+    res.status(200).json(response);
 
   } catch (error) {
     console.error("Error in getAttendance:", error);
-    res.status(500).json({ success: false, error: "Server error: " + error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: "Server error: " + error.message 
+    });
   }
 };
+
+// latest one:
+
+// const getFormattedDate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+//   if (dateString.includes('/')) return dateString;
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // CRON JOB: Create attendance for tomorrow
+// cron.schedule('0 0 * * *', async () => {
+//   try {
+//     const tomorrow = new Date();
+//     tomorrow.setDate(tomorrow.getDate() + 1);
+//     const dateStr = getFormattedDate(tomorrow);
+
+//     const supervisors = await Supervisor.find({}).lean();
+//     if (!supervisors.length) return;
+
+//     const exists = await SupervisorAttendance.countDocuments({ date: dateStr });
+//     if (exists > 0) return;
+
+//     for (const supervisor of supervisors) {
+//       const newEntry = new SupervisorAttendance({
+//         date: dateStr,
+//         supervisorId: supervisor._id,
+//         status: null
+//       });
+//       await newEntry.save();
+//     }
+
+//     console.log(`✅ Created attendance for ${dateStr}`);
+//   } catch (err) {
+//     console.error("❌ Cron error:", err.message);
+//   }
+// });
+
+// // GET today’s attendance (fallback creation)
+// export const getAttendance = async (req, res) => {
+//   try {
+//     const today = new Date();
+//     const todayFormatted = getFormattedDate(today);
+
+//     const supervisors = await Supervisor.find({})
+//     .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     if (!supervisors.length) {
+//       return res.status(200).json({ success: true, message: "No supervisors found.", data: [] });
+//     }
+
+//     let records = await SupervisorAttendance.find({ date: todayFormatted });
+//     if (records.length === 0) {
+//       for (const supervisor of supervisors) {
+//         const newEntry = new SupervisorAttendance({
+//           date: todayFormatted,
+//           supervisorId: supervisor._id,
+//           status: null
+//         });
+//         await newEntry.save();
+//       }
+//     }
+
+//     // Re-fetch after fallback creation
+//     records = await SupervisorAttendance.find({ date: todayFormatted })
+//       .populate({ path: 'supervisorId', select: '_id name email photo' })
+//       .lean();
+
+//     const validRecords = records.filter(r => r.supervisorId);
+
+//     const data = validRecords.map(r => ({
+//       _id: r._id,
+//       date: formatDate(r.date),
+//       supervisor: {
+//         _id: r.supervisorId._id,
+//         name: r.supervisorId.name,
+//         email: r.supervisorId.email,
+//         photo: r.supervisorId.photo
+//       },
+//       status: r.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       currentDate: formatDate(todayFormatted),
+//       data
+//     });
+
+//   } catch (error) {
+//     console.error("Error in getAttendance:", error);
+//     res.status(500).json({ success: false, error: "Server error: " + error.message });
+//   }
+// };
 
 
 
