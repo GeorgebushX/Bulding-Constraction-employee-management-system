@@ -72,6 +72,7 @@ import pdfkit from 'pdfkit';
 
 
 
+
 const formatDisplayDate = (dateString) => {
   if (!dateString) return '';
   const [year, month, day] = dateString.split('-');
@@ -80,7 +81,7 @@ const formatDisplayDate = (dateString) => {
 
 const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
 
-// CRON JOB
+// CRON JOB (unchanged)
 cron.schedule('0 0 * * *', async () => {
   try {
     const tomorrow = new Date();
@@ -110,72 +111,71 @@ cron.schedule('0 0 * * *', async () => {
   }
 });
 
-// GET today's attendance
+// GET today's attendance with supervisor records
 export const getAttendance = async (req, res) => {
   try {
     const today = new Date();
     const todayISODate = getISODate(today);
 
-    // Check if records exist for today
-    let recordsExist = await SupervisorAttendance.exists({ date: todayISODate });
+    // First get all supervisors
+    const allSupervisors = await Supervisor.find({}).lean();
     
-    // Create records if they don't exist
-    if (!recordsExist) {
-      const supervisors = await Supervisor.find({});
-      
-      if (supervisors.length > 0) {
-        const bulkOps = supervisors.map(supervisor => ({
-          insertOne: {
-            document: {
-              date: todayISODate,
-              supervisorId: supervisor._id,
-              status: null
-            }
-          }
-        }));
-        
-        await SupervisorAttendance.bulkWrite(bulkOps);
-      }
+    if (!allSupervisors.length) {
+      return res.status(200).json({
+        success: true,
+        currentDate: formatDisplayDate(todayISODate),
+        data: []
+      });
     }
 
-    // Fetch records with aggregation for better performance
-    const records = await SupervisorAttendance.aggregate([
-      { $match: { date: todayISODate } },
-      {
-        $lookup: {
-          from: 'centeringSupervisors', // Make sure this matches your Supervisor collection name
-          localField: 'supervisorId',
-          foreignField: '_id',
-          as: 'supervisor'
+    // Get existing attendance records for today
+    const existingRecords = await SupervisorAttendance.find({ 
+      date: todayISODate 
+    }).lean();
+
+    // Create a map of existing records by supervisorId for quick lookup
+    const existingRecordsMap = existingRecords.reduce((acc, record) => {
+      acc[record.supervisorId] = record;
+      return acc;
+    }, {});
+
+    // Prepare the response data
+    const responseData = allSupervisors.map(supervisor => {
+      const existingRecord = existingRecordsMap[supervisor._id];
+      
+      return {
+        _id: existingRecord?._id || supervisor._id,
+        date: formatDisplayDate(todayISODate),
+        status: existingRecord?.status || null,
+        supervisor: {
+          _id: supervisor._id,
+          name: supervisor.name,
+          email: supervisor.email,
+          photo: supervisor.photo
         }
-      },
-      { $unwind: '$supervisor' },
-      {
-        $project: {
-          _id: 1,
-          date: 1,
-          status: 1,
-          supervisor: {
-            _id: '$supervisor._id',
-            name: '$supervisor.name',
-            email: '$supervisor.email',
-            photo: '$supervisor.photo'
+      };
+    });
+
+    // If no attendance records exist at all for today, create them
+    if (existingRecords.length === 0) {
+      const bulkOps = allSupervisors.map(supervisor => ({
+        insertOne: {
+          document: {
+            date: todayISODate,
+            supervisorId: supervisor._id,
+            status: null
           }
         }
-      }
-    ]);
+      }));
+      
+      await SupervisorAttendance.bulkWrite(bulkOps);
+    }
 
-    // Format response
-    const response = {
+    res.status(200).json({
       success: true,
       currentDate: formatDisplayDate(todayISODate),
-      data: records.map(record => ({
-        ...record,
-        date: formatDisplayDate(record.date)
-      }))
-    };
-
-    res.status(200).json(response);
+      data: responseData
+    });
 
   } catch (error) {
     console.error("Error in getAttendance:", error);
