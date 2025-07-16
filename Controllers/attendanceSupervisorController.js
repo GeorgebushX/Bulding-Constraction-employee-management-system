@@ -5,33 +5,33 @@ import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
-// Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
-const formatDate = (dateString) => {
-  if (!dateString) return '';
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
   
-  // If already in DD/MM/YYYY format, return as-is
-  if (dateString.includes('/')) {
-    return dateString;
-  }
+//   // If already in DD/MM/YYYY format, return as-is
+//   if (dateString.includes('/')) {
+//     return dateString;
+//   }
   
-  // Convert from YYYY-MM-DD to DD/MM/YYYY
-  const [year, month, day] = dateString.split('-');
-  return `${day}/${month}/${year}`;
-};
+//   // Convert from YYYY-MM-DD to DD/MM/YYYY
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
 
-// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
-const parseToDbDate = (dateString) => {
-  if (!dateString) return '';
+// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+// const parseToDbDate = (dateString) => {
+//   if (!dateString) return '';
   
-  // If already in YYYY-MM-DD format, return as-is
-  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-    return dateString;
-  }
+//   // If already in YYYY-MM-DD format, return as-is
+//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+//     return dateString;
+//   }
   
-  // Convert from DD/MM/YYYY to YYYY-MM-DD
-  const [day, month, year] = dateString.split('/');
-  return `${year}-${month}-${day}`;
-};
+//   // Convert from DD/MM/YYYY to YYYY-MM-DD
+//   const [day, month, year] = dateString.split('/');
+//   return `${year}-${month}-${day}`;
+// };
 
 // 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
@@ -76,12 +76,12 @@ export const getAllAttendance = async (req, res) => {
 
 const getFormattedDate = (dateObj) => dateObj.toISOString().split('T')[0];
 
-// const formatDate = (dateString) => {
-//   if (!dateString) return '';
-//   if (dateString.includes('/')) return dateString;
-//   const [year, month, day] = dateString.split('-');
-//   return `${day}/${month}/${year}`;
-// };
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  if (dateString.includes('/')) return dateString;
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+};
 
 // CRON JOB: Create attendance for tomorrow
 cron.schedule('0 0 * * *', async () => {
