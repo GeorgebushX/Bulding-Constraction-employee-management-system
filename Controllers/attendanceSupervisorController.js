@@ -5,71 +5,74 @@ import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
-// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
-// const formatDate = (dateString) => {
-//   if (!dateString) return '';
+// Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+const formatDate = (dateString) => {
+  if (!dateString) return '';
   
-//   // If already in DD/MM/YYYY format, return as-is
-//   if (dateString.includes('/')) {
-//     return dateString;
-//   }
+  // If already in DD/MM/YYYY format, return as-is
+  if (dateString.includes('/')) {
+    return dateString;
+  }
   
-//   // Convert from YYYY-MM-DD to DD/MM/YYYY
-//   const [year, month, day] = dateString.split('-');
-//   return `${day}/${month}/${year}`;
-// };
+  // Convert from YYYY-MM-DD to DD/MM/YYYY
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+};
 
-// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
-// const parseToDbDate = (dateString) => {
-//   if (!dateString) return '';
+// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+const parseToDbDate = (dateString) => {
+  if (!dateString) return '';
   
-//   // If already in YYYY-MM-DD format, return as-is
-//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-//     return dateString;
-//   }
+  // If already in YYYY-MM-DD format, return as-is
+  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+    return dateString;
+  }
   
-//   // Convert from DD/MM/YYYY to YYYY-MM-DD
-//   const [day, month, year] = dateString.split('/');
-//   return `${year}-${month}-${day}`;
-// };
+  // Convert from DD/MM/YYYY to YYYY-MM-DD
+  const [day, month, year] = dateString.split('/');
+  return `${year}-${month}-${day}`;
+};
 
-// // 1. GET all attendance records
-// export const getAllAttendance = async (req, res) => {
-//   try {
-//     const attendanceRecords = await SupervisorAttendance.find({})
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .lean();
+// 1. GET all attendance records
+export const getAllAttendance = async (req, res) => {
+  try {
+    const attendanceRecords = await SupervisorAttendance.find({})
+      .populate({
+        path: 'supervisorId',
+        select: '_id name email photo',
+        match: { _id: { $exists: true } }
+      })
+      .lean();
 
-//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+    const validRecords = attendanceRecords.filter(record => record.supervisorId);
 
-//     const formattedData = validRecords.map(record => ({
-//       _id: record._id,
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email
-//       },
-//       status: record.status
-//     }));
+    const formattedData = validRecords.map(record => ({
+      _id: record._id,
+      date: formatDate(record.date),
+      supervisor: {
+        _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
+        name: record.supervisorId.name,
+        email: record.supervisorId.email
+      },
+      status: record.status
+    }));
 
-//     res.status(200).json({
-//       success: true,
-//       data: formattedData
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
+    res.status(200).json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
 
+
+
+// latest one:
 
 
 // Format date as DD/MM/YYYY
@@ -199,106 +202,6 @@ export const getAttendance = async (req, res) => {
     });
   }
 };
-
-// latest one:
-
-// const getFormattedDate = (dateObj) => dateObj.toISOString().split('T')[0];
-
-// const formatDate = (dateString) => {
-//   if (!dateString) return '';
-//   if (dateString.includes('/')) return dateString;
-//   const [year, month, day] = dateString.split('-');
-//   return `${day}/${month}/${year}`;
-// };
-
-// // CRON JOB: Create attendance for tomorrow
-// cron.schedule('0 0 * * *', async () => {
-//   try {
-//     const tomorrow = new Date();
-//     tomorrow.setDate(tomorrow.getDate() + 1);
-//     const dateStr = getFormattedDate(tomorrow);
-
-//     const supervisors = await Supervisor.find({}).lean();
-//     if (!supervisors.length) return;
-
-//     const exists = await SupervisorAttendance.countDocuments({ date: dateStr });
-//     if (exists > 0) return;
-
-//     for (const supervisor of supervisors) {
-//       const newEntry = new SupervisorAttendance({
-//         date: dateStr,
-//         supervisorId: supervisor._id,
-//         status: null
-//       });
-//       await newEntry.save();
-//     }
-
-//     console.log(`✅ Created attendance for ${dateStr}`);
-//   } catch (err) {
-//     console.error("❌ Cron error:", err.message);
-//   }
-// });
-
-// // GET today’s attendance (fallback creation)
-// export const getAttendance = async (req, res) => {
-//   try {
-//     const today = new Date();
-//     const todayFormatted = getFormattedDate(today);
-
-//     const supervisors = await Supervisor.find({})
-//     .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .lean();
-
-//     if (!supervisors.length) {
-//       return res.status(200).json({ success: true, message: "No supervisors found.", data: [] });
-//     }
-
-//     let records = await SupervisorAttendance.find({ date: todayFormatted });
-//     if (records.length === 0) {
-//       for (const supervisor of supervisors) {
-//         const newEntry = new SupervisorAttendance({
-//           date: todayFormatted,
-//           supervisorId: supervisor._id,
-//           status: null
-//         });
-//         await newEntry.save();
-//       }
-//     }
-
-//     // Re-fetch after fallback creation
-//     records = await SupervisorAttendance.find({ date: todayFormatted })
-//       .populate({ path: 'supervisorId', select: '_id name email photo' })
-//       .lean();
-
-//     const validRecords = records.filter(r => r.supervisorId);
-
-//     const data = validRecords.map(r => ({
-//       _id: r._id,
-//       date: formatDate(r.date),
-//       supervisor: {
-//         _id: r.supervisorId._id,
-//         name: r.supervisorId.name,
-//         email: r.supervisorId.email,
-//         photo: r.supervisorId.photo
-//       },
-//       status: r.status
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       currentDate: formatDate(todayFormatted),
-//       data
-//     });
-
-//   } catch (error) {
-//     console.error("Error in getAttendance:", error);
-//     res.status(500).json({ success: false, error: "Server error: " + error.message });
-//   }
-// };
 
 
 

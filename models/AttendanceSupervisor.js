@@ -27,5 +27,10 @@ const AttendanceSupervisorSchema = new mongoose.Schema({
     }
     next();
 });
+// Add unique compound index to prevent duplicates
+AttendanceSupervisorSchema.index(
+  { date: 1, supervisorId: 1 }, 
+  { unique: true }
+);
 
 export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);      

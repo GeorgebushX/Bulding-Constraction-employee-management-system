@@ -2,7 +2,7 @@
 
 import express from 'express';
 import {
-  // getAllAttendance,
+  getAllAttendance,
   updateAttendanceById,
   updateStatusBySupervisorAndDate,
   // get date today
@@ -22,11 +22,12 @@ import defaultAttendance from "../middleware/defaultAttendance.js";
 const router = express.Router();
 
 // Basic attendance routes
-router.get('/attendance', defaultAttendance, authMiddleware, getAttendance);
+router.get('/attendance', defaultAttendance, authMiddleware, getAllAttendance);
+router.get('/attendance/day', defaultAttendance, authMiddleware, getAttendance);
 // router.get('/attendance/day',authMiddleware, getAllAttendance);
 router.put('/attendance/:id', authMiddleware, updateAttendanceById);
 router.put('/attendance/status/:supervisorId', authMiddleware, updateStatusBySupervisorAndDate);
-
+  
 // getTodaySupervisorAttendance     
 router.get('/attendance/today', authMiddleware, getTodaySupervisorAttendance);
 // filter by date:
