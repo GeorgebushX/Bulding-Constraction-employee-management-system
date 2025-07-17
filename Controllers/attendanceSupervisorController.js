@@ -5,35 +5,135 @@ import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   // If already in DD/MM/YYYY format, return as-is
+//   if (dateString.includes('/')) {
+//     return dateString;
+//   }
+  
+//   // Convert from YYYY-MM-DD to DD/MM/YYYY
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+// const parseToDbDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   // If already in YYYY-MM-DD format, return as-is
+//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+//     return dateString;
+//   }
+  
+//   // Convert from DD/MM/YYYY to YYYY-MM-DD
+//   const [day, month, year] = dateString.split('/');
+//   return `${year}-${month}-${day}`;
+// };
+
+// // 1. GET all attendance records
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         photo: record.supervisorId.photo,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email
+//       },
+//       status: record.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
 // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
   if (!dateString) return '';
-  
-  // If already in DD/MM/YYYY format, return as-is
-  if (dateString.includes('/')) {
-    return dateString;
-  }
-  
-  // Convert from YYYY-MM-DD to DD/MM/YYYY
+  if (dateString.includes('/')) return dateString;
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
-// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+// Helper to convert from DD/MM/YYYY to YYYY-MM-DD
 const parseToDbDate = (dateString) => {
   if (!dateString) return '';
-  
-  // If already in YYYY-MM-DD format, return as-is
-  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-    return dateString;
-  }
-  
-  // Convert from DD/MM/YYYY to YYYY-MM-DD
+  if (dateString.includes('-') && dateString.split('-')[0].length === 4) return dateString;
   const [day, month, year] = dateString.split('/');
   return `${year}-${month}-${day}`;
 };
 
-// 1. GET all attendance records
+// Helper to get current date in YYYY-MM-DD
+const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+/** 
+ * 🕛 CRON JOB — Reset attendance for NEXT DAY 
+ * Runs daily at midnight.
+ */
+cron.schedule('0 0 * * *', async () => {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowISO = getISODate(tomorrow);
+
+    const allSupervisors = await Supervisor.find({}).lean();
+
+    if (!allSupervisors.length) {
+      console.log('No supervisors found.');
+      return;
+    }
+
+    // Clean old record (if duplicated)
+    await SupervisorAttendance.deleteMany({ date: tomorrowISO });
+
+    const bulkData = allSupervisors.map((supervisor) => ({
+      insertOne: {
+        document: {
+          date: tomorrowISO,
+          supervisorId: supervisor._id,
+          status: null
+        }
+      }
+    }));
+
+    await SupervisorAttendance.bulkWrite(bulkData);
+
+    console.log(`✅ Attendance reset for ${formatDate(tomorrowISO)} | Total: ${allSupervisors.length}`);
+
+  } catch (error) {
+    console.error("❌ Error resetting attendance:", error.message);
+  }
+});
+
+/**
+ * 📦 GET Controller — Get All Attendance
+ * GET /api/attendance/supervisors
+ */
 export const getAllAttendance = async (req, res) => {
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
@@ -51,9 +151,9 @@ export const getAllAttendance = async (req, res) => {
       date: formatDate(record.date),
       supervisor: {
         _id: record.supervisorId._id,
-        photo: record.supervisorId.photo,
         name: record.supervisorId.name,
-        email: record.supervisorId.email
+        email: record.supervisorId.email,
+        photo: record.supervisorId.photo
       },
       status: record.status
     }));
@@ -83,7 +183,7 @@ const formatDisplayDate = (dateString) => {
 };
 
 // Get date in YYYY-MM-DD format
-const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+// const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
 
 // CRON JOB - Reset attendance daily at midnight
 cron.schedule('0 0 * * *', async () => {
