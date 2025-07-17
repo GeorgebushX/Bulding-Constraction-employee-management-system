@@ -88,7 +88,7 @@ const parseToDbDate = (dateString) => {
   return `${year}-${month}-${day}`;
 };
 
-const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+// const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
 
 
 // === 🕛 CRON JOB — Reset attendance every midnight for next day ===
@@ -269,15 +269,18 @@ export const getAllAttendance = async (req, res) => {
 // latest one:
 
 
-// Format date as DD/MM/YYYY
+// Helper functions
 const formatDisplayDate = (dateString) => {
   if (!dateString) return '';
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
-// Get date in YYYY-MM-DD format
-// const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+const getISODate = (dateObj) => {
+  const offset = dateObj.getTimezoneOffset();
+  dateObj = new Date(dateObj.getTime() - (offset * 60 * 1000));
+  return dateObj.toISOString().split('T')[0];
+};
 
 // CRON JOB - Reset attendance daily at midnight
 cron.schedule('0 0 * * *', async () => {
@@ -286,31 +289,30 @@ cron.schedule('0 0 * * *', async () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowISODate = getISODate(tomorrow);
 
-    // Get ALL supervisors (both active and inactive)
+    // Get ALL supervisors
     const allSupervisors = await Supervisor.find({}).lean();
-    
-    if (!allSupervisors.length) {
-      console.log('No supervisors found in database');
-      return;
-    }
 
     // Delete existing tomorrow's records if any
-    await SupervisorAttendance.deleteMany({ date: tomorrowISODate });
+    await AttendanceSupervisor.deleteMany({ date: tomorrowISODate });
 
     // Create fresh records for ALL supervisors with null status
-    const bulkOps = allSupervisors.map(supervisor => ({
-      insertOne: {
-        document: {
-          date: tomorrowISODate,
-          supervisorId: supervisor._id,
-          status: null
-        }
+    const attendanceRecords = allSupervisors.map(supervisor => ({
+      date: tomorrowISODate,
+      supervisorId: supervisor._id,
+      status: null,
+      supervisor: {
+        _id: supervisor._id,
+        name: supervisor.name,
+        email: supervisor.email,
+        photo: supervisor.photo
       }
     }));
 
-    await SupervisorAttendance.bulkWrite(bulkOps);
-    console.log(`✅ Reset attendance for ${formatDisplayDate(tomorrowISODate)} - Created ${allSupervisors.length} records`);
+    if (attendanceRecords.length > 0) {
+      await AttendanceSupervisor.insertMany(attendanceRecords);
+    }
 
+    console.log(`✅ Reset attendance for ${formatDisplayDate(tomorrowISODate)} - Created ${allSupervisors.length} records`);
   } catch (err) {
     console.error("❌ Daily reset error:", err.message);
   }
@@ -323,8 +325,10 @@ export const getAttendance = async (req, res) => {
     const todayISODate = getISODate(today);
     const displayDate = formatDisplayDate(todayISODate);
 
-    // Get ALL supervisors (both active and inactive)
-    const allSupervisors = await Supervisor.find({}).lean();
+    // Get ALL supervisors with required fields
+    const allSupervisors = await Supervisor.find({})
+      .select('_id name email photo')
+      .lean();
     
     if (!allSupervisors.length) {
       return res.status(200).json({
@@ -335,22 +339,18 @@ export const getAttendance = async (req, res) => {
     }
 
     // Get today's attendance records
-    const todayRecords = await SupervisorAttendance.find({ 
+    const todayRecords = await AttendanceSupervisor.find({ 
       date: todayISODate 
-    }).lean();
+    }).sort({ _id: 1 }).lean(); // Sort by auto-incremented ID
 
-    // Create map for quick lookup
-    const attendanceMap = todayRecords.reduce((map, record) => {
-      map[record.supervisorId] = record;
-      return map;
-    }, {});
-
-    // Prepare response - include ALL supervisors
+    // Prepare response data
     const responseData = allSupervisors.map(supervisor => {
-      const attendanceRecord = attendanceMap[supervisor._id];
-      
+      const attendanceRecord = todayRecords.find(record => 
+        record.supervisorId === supervisor._id
+      );
+
       return {
-        _id: attendanceRecord?._id || supervisor._id,
+        _id: attendanceRecord?._id || null, // Auto-incremented attendance ID
         date: displayDate,
         status: attendanceRecord?.status || null,
         supervisor: {
@@ -363,29 +363,52 @@ export const getAttendance = async (req, res) => {
     });
 
     // Create attendance records for any missing supervisors
-    const missingSupervisors = allSupervisors.filter(
-      s => !attendanceMap[s._id]
+    const missingSupervisors = allSupervisors.filter(supervisor => 
+      !todayRecords.some(record => record.supervisorId === supervisor._id)
     );
 
     if (missingSupervisors.length > 0) {
-      const createOps = missingSupervisors.map(supervisor => ({
-        insertOne: {
-          document: {
-            date: todayISODate,
-            supervisorId: supervisor._id,
-            status: null
-          }
+      const recordsToCreate = missingSupervisors.map(supervisor => ({
+        date: todayISODate,
+        supervisorId: supervisor._id,
+        status: null,
+        supervisor: {
+          _id: supervisor._id,
+          name: supervisor.name,
+          email: supervisor.email,
+          photo: supervisor.photo
         }
       }));
 
-      await SupervisorAttendance.bulkWrite(createOps);
+      await AttendanceSupervisor.insertMany(recordsToCreate);
       console.log(`Created ${missingSupervisors.length} missing attendance records`);
     }
+
+    // Get updated records after creation
+    const updatedRecords = await AttendanceSupervisor.find({ date: todayISODate })
+      .sort({ _id: 1 })
+      .lean();
+
+    // Prepare final response with proper auto-incremented IDs
+    const finalResponse = allSupervisors.map(supervisor => {
+      const record = updatedRecords.find(r => r.supervisorId === supervisor._id);
+      return {
+        _id: record._id, // Auto-incremented ID
+        date: displayDate,
+        status: record?.status || null,
+        supervisor: {
+          _id: supervisor._id,
+          name: supervisor.name,
+          email: supervisor.email,
+          photo: supervisor.photo
+        }
+      };
+    });
 
     res.status(200).json({
       success: true,
       currentDate: displayDate,
-      data: responseData
+      data: finalResponse
     });
 
   } catch (error) {
@@ -396,6 +419,137 @@ export const getAttendance = async (req, res) => {
     });
   }
 };
+
+
+
+
+// // Format date as DD/MM/YYYY
+// const formatDisplayDate = (dateString) => {
+//   if (!dateString) return '';
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Get date in YYYY-MM-DD format
+// // const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+// // CRON JOB - Reset attendance daily at midnight
+// cron.schedule('0 0 * * *', async () => {
+//   try {
+//     const tomorrow = new Date();
+//     tomorrow.setDate(tomorrow.getDate() + 1);
+//     const tomorrowISODate = getISODate(tomorrow);
+
+//     // Get ALL supervisors (both active and inactive)
+//     const allSupervisors = await Supervisor.find({}).lean();
+    
+//     if (!allSupervisors.length) {
+//       console.log('No supervisors found in database');
+//       return;
+//     }
+
+//     // Delete existing tomorrow's records if any
+//     await SupervisorAttendance.deleteMany({ date: tomorrowISODate });
+
+//     // Create fresh records for ALL supervisors with null status
+//     const bulkOps = allSupervisors.map(supervisor => ({
+//       insertOne: {
+//         document: {
+//           date: tomorrowISODate,
+//           supervisorId: supervisor._id,
+//           status: null
+//         }
+//       }
+//     }));
+
+//     await SupervisorAttendance.bulkWrite(bulkOps);
+//     console.log(`✅ Reset attendance for ${formatDisplayDate(tomorrowISODate)} - Created ${allSupervisors.length} records`);
+
+//   } catch (err) {
+//     console.error("❌ Daily reset error:", err.message);
+//   }
+// });
+
+// // GET today's attendance for ALL supervisors
+// export const getAttendance = async (req, res) => {
+//   try {
+//     const today = new Date();
+//     const todayISODate = getISODate(today);
+//     const displayDate = formatDisplayDate(todayISODate);
+
+//     // Get ALL supervisors (both active and inactive)
+//     const allSupervisors = await Supervisor.find({}).lean();
+    
+//     if (!allSupervisors.length) {
+//       return res.status(200).json({
+//         success: true,
+//         currentDate: displayDate,
+//         data: []
+//       });
+//     }
+
+//     // Get today's attendance records
+//     const todayRecords = await SupervisorAttendance.find({ 
+//       date: todayISODate 
+//     }).lean();
+
+//     // Create map for quick lookup
+//     const attendanceMap = todayRecords.reduce((map, record) => {
+//       map[record.supervisorId] = record;
+//       return map;
+//     }, {});
+
+//     // Prepare response - include ALL supervisors
+//     const responseData = allSupervisors.map(supervisor => {
+//       const attendanceRecord = attendanceMap[supervisor._id];
+      
+//       return {
+//         _id: attendanceRecord?._id || supervisor._id,
+//         date: displayDate,
+//         status: attendanceRecord?.status || null,
+//         supervisor: {
+//           _id: supervisor._id,
+//           name: supervisor.name,
+//           email: supervisor.email,
+//           photo: supervisor.photo
+//         }
+//       };
+//     });
+
+//     // Create attendance records for any missing supervisors
+//     const missingSupervisors = allSupervisors.filter(
+//       s => !attendanceMap[s._id]
+//     );
+
+//     if (missingSupervisors.length > 0) {
+//       const createOps = missingSupervisors.map(supervisor => ({
+//         insertOne: {
+//           document: {
+//             date: todayISODate,
+//             supervisorId: supervisor._id,
+//             status: null
+//           }
+//         }
+//       }));
+
+//       await SupervisorAttendance.bulkWrite(createOps);
+//       console.log(`Created ${missingSupervisors.length} missing attendance records`);
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       currentDate: displayDate,
+//       data: responseData
+//     });
+
+//   } catch (error) {
+//     console.error("Error in getAttendance:", error);
+//     res.status(500).json({ 
+//       success: false, 
+//       error: "Server error: " + error.message 
+//     });
+//   }
+// };
 
 
 
