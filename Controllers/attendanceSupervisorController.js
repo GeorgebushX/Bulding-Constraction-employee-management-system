@@ -5,6 +5,8 @@ import Supervisor from "../models/CenteringSupervisor.js";
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
 
+
+
 // // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 // const formatDate = (dateString) => {
 //   if (!dateString) return '';
@@ -73,61 +75,62 @@ import pdfkit from 'pdfkit';
 
 
 
-// === Helper Functions ===
+// Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
   if (!dateString) return '';
-  if (dateString.includes('/')) return dateString;
+  
+  if (dateString.includes('/')) {
+    return dateString;
+  }
+  
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
 
+// Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
 const parseToDbDate = (dateString) => {
   if (!dateString) return '';
-  if (dateString.includes('-') && dateString.split('-')[0].length === 4) return dateString;
+  
+  if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+    return dateString;
+  }
+  
   const [day, month, year] = dateString.split('/');
   return `${year}-${month}-${day}`;
 };
 
-// const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+// Function to get tomorrow's date in YYYY-MM-DD format
+const getTomorrowDate = () => {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  return tomorrow.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+};
 
-
-// === 🕛 CRON JOB — Reset attendance every midnight for next day ===
+// Schedule a cron job to run daily at midnight
 cron.schedule('0 0 * * *', async () => {
   try {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowISO = getISODate(tomorrow);
-
-    const allSupervisors = await Supervisor.find({}).lean();
-
-    if (!allSupervisors.length) {
-      console.log('⚠️ No supervisors found.');
-      return;
-    }
-
-    // Remove existing attendance for tomorrow if already present
-    await SupervisorAttendance.deleteMany({ date: tomorrowISO });
-
-    const bulkInserts = allSupervisors.map((supervisor) => ({
-      insertOne: {
-        document: {
-          date: tomorrowISO,
-          supervisorId: supervisor._id,
-          status: null
-        }
+    const tomorrowDate = getTomorrowDate();
+    
+    // Update all attendance records with tomorrow's date and null status
+    await SupervisorAttendance.updateMany(
+      {},
+      { 
+        $set: { 
+          date: tomorrowDate,
+          status: null 
+        } 
       }
-    }));
-
-    await SupervisorAttendance.bulkWrite(bulkInserts);
-
-    console.log(`✅ Attendance initialized for ${formatDate(tomorrowISO)} — Total: ${allSupervisors.length}`);
+    );
+    
+    console.log(`Successfully reset attendance for date: ${tomorrowDate}`);
   } catch (error) {
-    console.error("❌ CRON Reset Error:", error.message);
+    console.error('Error resetting attendance:', error.message);
   }
 });
 
-
-// === 📦 GET — Fetch All Attendance Records ===
+// 1. GET all attendance records
 export const getAllAttendance = async (req, res) => {
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
@@ -145,9 +148,9 @@ export const getAllAttendance = async (req, res) => {
       date: formatDate(record.date),
       supervisor: {
         _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
         name: record.supervisorId.name,
-        email: record.supervisorId.email,
-        photo: record.supervisorId.photo
+        email: record.supervisorId.email
       },
       status: record.status
     }));
@@ -163,6 +166,12 @@ export const getAllAttendance = async (req, res) => {
     });
   }
 };
+
+// Other controller methods (create, update, etc.) would go here...
+
+
+
+
 
 
 
