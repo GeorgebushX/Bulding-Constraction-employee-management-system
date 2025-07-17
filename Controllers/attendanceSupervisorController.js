@@ -72,7 +72,8 @@ import pdfkit from 'pdfkit';
 
 
 
-// Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+
+// === Helper Functions ===
 const formatDate = (dateString) => {
   if (!dateString) return '';
   if (dateString.includes('/')) return dateString;
@@ -80,7 +81,6 @@ const formatDate = (dateString) => {
   return `${day}/${month}/${year}`;
 };
 
-// Helper to convert from DD/MM/YYYY to YYYY-MM-DD
 const parseToDbDate = (dateString) => {
   if (!dateString) return '';
   if (dateString.includes('-') && dateString.split('-')[0].length === 4) return dateString;
@@ -88,13 +88,10 @@ const parseToDbDate = (dateString) => {
   return `${year}-${month}-${day}`;
 };
 
-// Helper to get current date in YYYY-MM-DD
 const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
 
-/** 
- * 🕛 CRON JOB — Reset attendance for NEXT DAY 
- * Runs daily at midnight.
- */
+
+// === 🕛 CRON JOB — Reset attendance every midnight for next day ===
 cron.schedule('0 0 * * *', async () => {
   try {
     const tomorrow = new Date();
@@ -104,14 +101,14 @@ cron.schedule('0 0 * * *', async () => {
     const allSupervisors = await Supervisor.find({}).lean();
 
     if (!allSupervisors.length) {
-      console.log('No supervisors found.');
+      console.log('⚠️ No supervisors found.');
       return;
     }
 
-    // Clean old record (if duplicated)
+    // Remove existing attendance for tomorrow if already present
     await SupervisorAttendance.deleteMany({ date: tomorrowISO });
 
-    const bulkData = allSupervisors.map((supervisor) => ({
+    const bulkInserts = allSupervisors.map((supervisor) => ({
       insertOne: {
         document: {
           date: tomorrowISO,
@@ -121,19 +118,16 @@ cron.schedule('0 0 * * *', async () => {
       }
     }));
 
-    await SupervisorAttendance.bulkWrite(bulkData);
+    await SupervisorAttendance.bulkWrite(bulkInserts);
 
-    console.log(`✅ Attendance reset for ${formatDate(tomorrowISO)} | Total: ${allSupervisors.length}`);
-
+    console.log(`✅ Attendance initialized for ${formatDate(tomorrowISO)} — Total: ${allSupervisors.length}`);
   } catch (error) {
-    console.error("❌ Error resetting attendance:", error.message);
+    console.error("❌ CRON Reset Error:", error.message);
   }
 });
 
-/**
- * 📦 GET Controller — Get All Attendance
- * GET /api/attendance/supervisors
- */
+
+// === 📦 GET — Fetch All Attendance Records ===
 export const getAllAttendance = async (req, res) => {
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
@@ -169,6 +163,106 @@ export const getAllAttendance = async (req, res) => {
     });
   }
 };
+
+
+
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+//   if (dateString.includes('/')) return dateString;
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Helper to convert from DD/MM/YYYY to YYYY-MM-DD
+// const parseToDbDate = (dateString) => {
+//   if (!dateString) return '';
+//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) return dateString;
+//   const [day, month, year] = dateString.split('/');
+//   return `${year}-${month}-${day}`;
+// };
+
+// // Helper to get current date in YYYY-MM-DD
+// const getISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+// /** 
+//  * 🕛 CRON JOB — Reset attendance for NEXT DAY 
+//  * Runs daily at midnight.
+//  */
+// cron.schedule('0 0 * * *', async () => {
+//   try {
+//     const tomorrow = new Date();
+//     tomorrow.setDate(tomorrow.getDate() + 1);
+//     const tomorrowISO = getISODate(tomorrow);
+
+//     const allSupervisors = await Supervisor.find({}).lean();
+
+//     if (!allSupervisors.length) {
+//       console.log('No supervisors found.');
+//       return;
+//     }
+
+//     // Clean old record (if duplicated)
+//     await SupervisorAttendance.deleteMany({ date: tomorrowISO });
+
+//     const bulkData = allSupervisors.map((supervisor) => ({
+//       insertOne: {
+//         document: {
+//           date: tomorrowISO,
+//           supervisorId: supervisor._id,
+//           status: null
+//         }
+//       }
+//     }));
+
+//     await SupervisorAttendance.bulkWrite(bulkData);
+
+//     console.log(`✅ Attendance reset for ${formatDate(tomorrowISO)} | Total: ${allSupervisors.length}`);
+
+//   } catch (error) {
+//     console.error("❌ Error resetting attendance:", error.message);
+//   }
+// });
+
+// /**
+//  * 📦 GET Controller — Get All Attendance
+//  * GET /api/attendance/supervisors
+//  */
+// export const getAllAttendance = async (req, res) => {
+//   try {
+//     const attendanceRecords = await SupervisorAttendance.find({})
+//       .populate({
+//         path: 'supervisorId',
+//         select: '_id name email photo',
+//         match: { _id: { $exists: true } }
+//       })
+//       .lean();
+
+//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+//     const formattedData = validRecords.map(record => ({
+//       _id: record._id,
+//       date: formatDate(record.date),
+//       supervisor: {
+//         _id: record.supervisorId._id,
+//         name: record.supervisorId.name,
+//         email: record.supervisorId.email,
+//         photo: record.supervisorId.photo
+//       },
+//       status: record.status
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       data: formattedData
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// };
 
 
 
