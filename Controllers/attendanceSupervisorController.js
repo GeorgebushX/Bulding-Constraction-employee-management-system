@@ -7,82 +7,16 @@ import pdfkit from 'pdfkit';
 
 
 
-// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
-// const formatDate = (dateString) => {
-//   if (!dateString) return '';
-  
-//   // If already in DD/MM/YYYY format, return as-is
-//   if (dateString.includes('/')) {
-//     return dateString;
-//   }
-  
-//   // Convert from YYYY-MM-DD to DD/MM/YYYY
-//   const [year, month, day] = dateString.split('-');
-//   return `${day}/${month}/${year}`;
-// };
-
-// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
-// const parseToDbDate = (dateString) => {
-//   if (!dateString) return '';
-  
-//   // If already in YYYY-MM-DD format, return as-is
-//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-//     return dateString;
-//   }
-  
-//   // Convert from DD/MM/YYYY to YYYY-MM-DD
-//   const [day, month, year] = dateString.split('/');
-//   return `${year}-${month}-${day}`;
-// };
-
-// // 1. GET all attendance records
-// export const getAllAttendance = async (req, res) => {
-//   try {
-//     const attendanceRecords = await SupervisorAttendance.find({})
-//       .populate({
-//         path: 'supervisorId',
-//         select: '_id name email photo',
-//         match: { _id: { $exists: true } }
-//       })
-//       .lean();
-
-//     const validRecords = attendanceRecords.filter(record => record.supervisorId);
-
-//     const formattedData = validRecords.map(record => ({
-//       _id: record._id,
-//       date: formatDate(record.date),
-//       supervisor: {
-//         _id: record.supervisorId._id,
-//         photo: record.supervisorId.photo,
-//         name: record.supervisorId.name,
-//         email: record.supervisorId.email
-//       },
-//       status: record.status
-//     }));
-
-//     res.status(200).json({
-//       success: true,
-//       data: formattedData
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
-
 // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
 const formatDate = (dateString) => {
   if (!dateString) return '';
   
+  // If already in DD/MM/YYYY format, return as-is
   if (dateString.includes('/')) {
     return dateString;
   }
   
+  // Convert from YYYY-MM-DD to DD/MM/YYYY
   const [year, month, day] = dateString.split('-');
   return `${day}/${month}/${year}`;
 };
@@ -91,13 +25,79 @@ const formatDate = (dateString) => {
 const parseToDbDate = (dateString) => {
   if (!dateString) return '';
   
+  // If already in YYYY-MM-DD format, return as-is
   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
     return dateString;
   }
   
+  // Convert from DD/MM/YYYY to YYYY-MM-DD
   const [day, month, year] = dateString.split('/');
   return `${year}-${month}-${day}`;
 };
+
+// 1. GET all attendance records
+export const getAllAttendance = async (req, res) => {
+  try {
+    const attendanceRecords = await SupervisorAttendance.find({})
+      .populate({
+        path: 'supervisorId',
+        select: '_id name email photo',
+        match: { _id: { $exists: true } }
+      })
+      .lean();
+
+    const validRecords = attendanceRecords.filter(record => record.supervisorId);
+
+    const formattedData = validRecords.map(record => ({
+      _id: record._id,
+      date: formatDate(record.date),
+      supervisor: {
+        _id: record.supervisorId._id,
+        photo: record.supervisorId.photo,
+        name: record.supervisorId.name,
+        email: record.supervisorId.email
+      },
+      status: record.status
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+
+
+
+// // Helper function to format date (from YYYY-MM-DD to DD/MM/YYYY)
+// const formatDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   if (dateString.includes('/')) {
+//     return dateString;
+//   }
+  
+//   const [year, month, day] = dateString.split('-');
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Helper function to parse date (from DD/MM/YYYY to YYYY-MM-DD)
+// const parseToDbDate = (dateString) => {
+//   if (!dateString) return '';
+  
+//   if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
+//     return dateString;
+//   }
+  
+//   const [day, month, year] = dateString.split('/');
+//   return `${year}-${month}-${day}`;
+// };
 
 // Function to get tomorrow's date in YYYY-MM-DD format
 const getTomorrowDate = () => {
@@ -131,7 +131,7 @@ cron.schedule('0 0 * * *', async () => {
 });
 
 // 1. GET all attendance records
-export const getAllAttendance = async (req, res) => {
+export const getDailyAttendance = async (req, res) => {
   try {
     const attendanceRecords = await SupervisorAttendance.find({})
       .populate({

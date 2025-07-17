@@ -3,6 +3,7 @@
 import express from 'express';
 import {
   getAllAttendance,
+  getDailyAttendance,
   updateAttendanceById,
   updateStatusBySupervisorAndDate,
   // get date today
@@ -23,6 +24,7 @@ const router = express.Router();
 
 // Basic attendance routes
 router.get('/attendance',defaultAttendance, authMiddleware, getAllAttendance);
+router.get('/attendance/daily',defaultAttendance, authMiddleware, getDailyAttendance);
 router.get('/attendance/day', defaultAttendance, authMiddleware, getAttendance);
 // router.get('/attendance/day',authMiddleware, getAllAttendance);
 router.put('/attendance/:id', authMiddleware, updateAttendanceById);
