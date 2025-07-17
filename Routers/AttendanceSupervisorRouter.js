@@ -22,7 +22,7 @@ import defaultAttendance from "../middleware/defaultAttendance.js";
 const router = express.Router();
 
 // Basic attendance routes
-router.get('/attendance', authMiddleware, getAllAttendance);
+router.get('/attendance',defaultAttendance, authMiddleware, getAllAttendance);
 router.get('/attendance/day', defaultAttendance, authMiddleware, getAttendance);
 // router.get('/attendance/day',authMiddleware, getAllAttendance);
 router.put('/attendance/:id', authMiddleware, updateAttendanceById);

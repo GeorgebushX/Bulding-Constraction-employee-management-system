@@ -269,6 +269,7 @@ export const getAllAttendance = async (req, res) => {
 // latest one:
 
 
+
 // Helper functions
 const formatDisplayDate = (dateString) => {
   if (!dateString) return '';
@@ -418,8 +419,7 @@ export const getAttendance = async (req, res) => {
       error: "Server error: " + error.message 
     });
   }
-};
-
+}; 
 
 
 
