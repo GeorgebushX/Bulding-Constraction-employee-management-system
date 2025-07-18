@@ -1,15 +1,10 @@
 
-
 import mongoose from "mongoose";
 
 const AttendanceSupervisorSchema = new mongoose.Schema({
   _id: { type: Number }, // This will be manually set to supervisorId
   date: { type: String, required: true },
-  supervisorId: { 
-    type: Number,
-    ref: "Supervisor",
-    required: true,
-  },
+  supervisorId: { type: Number, ref: "Supervisor"},  
   status: {
     type: String,
     enum: ["Fullday", "Halfday", "Overtime", null],
@@ -34,6 +29,7 @@ AttendanceSupervisorSchema.index(
 );
 
 export default mongoose.model("AttendanceSupervisor", AttendanceSupervisorSchema);      
+
 
 // import mongoose from "mongoose";
 

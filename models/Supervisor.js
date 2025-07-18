@@ -20,6 +20,8 @@ const supervisorSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+
+
   site: { type: Number, ref: 'Site' },
   name: { type: String, required: true },
   dateOfBirth: { 
@@ -57,7 +59,20 @@ const supervisorSchema = new mongoose.Schema({
   bankAccount: { type: String, trim: true },
   bankCode: { type: String, trim: true },
   photo: { type: String },
+
+
+
   supervisorIdProof: [{ type: String }],
+
+// supervisor attendance
+date: { type: String},
+status: {
+    type: String,
+    enum: ["Fullday", "Halfday", "Overtime", null],
+    default: null,
+  },
+
+
   createdAt: {
     type: String,
     default: () => formatDate(new Date())

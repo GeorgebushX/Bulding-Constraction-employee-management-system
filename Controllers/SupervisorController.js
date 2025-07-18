@@ -31,6 +31,7 @@ export const upload = multer({
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
     
+
     if (extname && mimetype) {
       return cb(null, true);
     } else {
@@ -47,7 +48,7 @@ export const createSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType
+      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status 
     } = req.body;
 
     // Validate required fields
@@ -125,7 +126,10 @@ export const createSupervisor = async (req, res) => {
       bankCode,
       supervisorIdProof,
       photo,
-      site
+      site,
+      date,     // ✅ Now included
+  status    // ✅ Now included
+
     });
 
     await newSupervisor.save();
