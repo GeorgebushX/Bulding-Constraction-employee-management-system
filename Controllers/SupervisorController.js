@@ -412,24 +412,11 @@ export const deleteSupervisorById = async (req, res) => {
 
 // for attendace
 
-// export const getSupervisorAttendance = async (req, res) => {
-//   try {
-//     const data = await Supervisor.find();
 
-//     return res.status(200).json({
-//       success: true,
-//       data
-//     });
 
-//   } catch (error) {
-//     console.error("Error fetching supervisor attendance:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
+
+
+
 
 
 // Helper function to format date as DD/MM/YYYY
@@ -450,14 +437,14 @@ const initializeAttendanceData = async () => {
     await Supervisor.updateMany(
       {
         $or: [
-          { date: { $ne: currentDate } },
-          { date: { $exists: false } }
+          { 'currentAttendance.date': { $ne: currentDate } },
+          { 'currentAttendance.date': { $exists: false } }
         ]
       },
       {
         $set: {
-          date: currentDate,
-          status: null
+          'currentAttendance.date': currentDate,
+          'currentAttendance.status': null
         }
       }
     );
@@ -483,27 +470,27 @@ export const getSupervisorAttendance = async (req, res) => {
     await Supervisor.updateMany(
       {
         $or: [
-          { date: { $ne: currentDate } },
-          { date: { $exists: false } }
+          { 'currentAttendance.date': { $ne: currentDate } },
+          { 'currentAttendance.date': { $exists: false } }
         ]
       },
       {
         $set: {
-          date: currentDate,
-          status: null
+          'currentAttendance.date': currentDate,
+          'currentAttendance.status': null
         }
       }
     );
 
     // Then fetch all supervisors
     const data = await Supervisor.find()
-      .select('_id name photo date status')
+      .select('_id name photo currentAttendance')
       .sort({ name: 1 });
 
     return res.status(200).json({
       success: true,
       data,
-      currentDate // Optional: include current date in response
+      currentDate
     });
 
   } catch (error) {
@@ -516,9 +503,6 @@ export const getSupervisorAttendance = async (req, res) => {
   }
 };
 
-
-// update the status 
-
 // Update attendance status for a supervisor
 export const updateSupervisorAttendance = async (req, res) => {
   try {
@@ -527,16 +511,16 @@ export const updateSupervisorAttendance = async (req, res) => {
     const currentDate = formatCurrentDate();
 
     const updatedSupervisor = await Supervisor.findOneAndUpdate(
-      { userId:supervisorId },
+      { userId: supervisorId },
       { 
         $set: { 
-          status,
-          date: currentDate 
+          'currentAttendance.status': status,
+          'currentAttendance.date': currentDate
         } 
       },
       { 
         new: true,
-        select: '_id name photo date status' 
+        select: '_id name photo currentAttendance' 
       }
     );
 
@@ -562,23 +546,14 @@ export const updateSupervisorAttendance = async (req, res) => {
   }
 };
 
-
-// 1. Apply attendance for all supervisors based on specific date (PUT)
+// Bulk update attendance for all supervisors based on specific date
 export const bulkUpdateAttendanceByDate = async (req, res) => {
   try {
     const { date, status } = req.body;
 
-    // Validate input
-    // if (!date || !status) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Date and status are required"
-    //   });
-    // }
-
     // Validate status
     const validStatuses = ["Fullday", "Halfday", "Overtime", null];
-    if (!validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Invalid status value"
@@ -586,19 +561,28 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
     }
 
     // Update all supervisors for the specified date
-    const result = await Supervisor.updateMany(
-      {},
-      {
-        $set: {
+    const updateQuery = {
+      $set: {
+        'currentAttendance.date': date,
+        'currentAttendance.status': status
+      }
+    };
+
+    // Add to attendance records if status is provided
+    if (status) {
+      updateQuery.$push = {
+        attendanceRecords: {
           date,
           status
         }
-      }
-    );
+      };
+    }
+
+    const result = await Supervisor.updateMany({}, updateQuery);
 
     // Get updated records
     const updatedSupervisors = await Supervisor.find()
-      .select('_id userId name date status')
+      .select('_id userId name currentAttendance')
       .sort({ name: 1 });
 
     return res.status(200).json({
@@ -617,6 +601,294 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
     });
   }
 };
+
+// Get attendance details for a specific date
+export const getAttendanceByDate = async (req, res) => {
+  try {
+    // const { date } = req.params;
+     // Combine day, month, year into DD/MM/YYYY format
+    const date = `${req.params.day}/${req.params.month}/${req.params.year}`;
+
+    // Validate date format (DD/MM/YYYY)
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Please use DD/MM/YYYY"
+      });
+    }
+
+    // Find all supervisors who have attendance records for the specified date
+    const supervisors = await Supervisor.aggregate([
+      {
+        $match: {
+          $or: [
+            { 'currentAttendance.date': date },
+            { 'attendanceRecords.date': date }
+          ]
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          currentStatus: {
+            $cond: {
+              if: { $eq: ['$currentAttendance.date', date] },
+              then: '$currentAttendance.status',
+              else: null
+            }
+          },
+          historicalStatus: {
+            $let: {
+              vars: {
+                filteredRecords: {
+                  $filter: {
+                    input: '$attendanceRecords',
+                    as: 'record',
+                    cond: { $eq: ['$$record.date', date] }
+                  }
+                }
+              },
+              in: { $arrayElemAt: ['$$filteredRecords.status', 0] }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          status: {
+            $cond: {
+              if: { $ne: ['$currentStatus', null] },
+              then: '$currentStatus',
+              else: '$historicalStatus'
+            }
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: supervisors,
+      date
+    });
+
+  } catch (error) {
+    console.error("Error fetching attendance by date:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // Helper function to format date as DD/MM/YYYY
+// const formatCurrentDate = () => {
+//   const date = new Date();
+//   const day = date.getDate().toString().padStart(2, '0');
+//   const month = (date.getMonth() + 1).toString().padStart(2, '0');
+//   const year = date.getFullYear();
+//   return `${day}/${month}/${year}`;
+// };
+
+// // Initialize or reset attendance data
+// const initializeAttendanceData = async () => {
+//   try {
+//     const currentDate = formatCurrentDate();
+    
+//     // Update all supervisors with missing date or outdated date
+//     await Supervisor.updateMany(
+//       {
+//         $or: [
+//           { date: { $ne: currentDate } },
+//           { date: { $exists: false } }
+//         ]
+//       },
+//       {
+//         $set: {
+//           date: currentDate,
+//           status: null
+//         }
+//       }
+//     );
+    
+//     console.log(`Attendance data initialized for date: ${currentDate}`);
+//   } catch (error) {
+//     console.error("Error initializing attendance data:", error);
+//   }
+// };
+
+// // Run initialization on server start
+// initializeAttendanceData();
+
+// // Schedule daily reset at midnight
+// cron.schedule('0 0 * * *', initializeAttendanceData);
+
+// // Get all supervisors with attendance data
+// export const getSupervisorAttendance = async (req, res) => {
+//   try {
+//     const currentDate = formatCurrentDate();
+    
+//     // First ensure all records have today's date
+//     await Supervisor.updateMany(
+//       {
+//         $or: [
+//           { date: { $ne: currentDate } },
+//           { date: { $exists: false } }
+//         ]
+//       },
+//       {
+//         $set: {
+//           date: currentDate,
+//           status: null
+//         }
+//       }
+//     );
+
+//     // Then fetch all supervisors
+//     const data = await Supervisor.find()
+//       .select('_id name photo date status')
+//       .sort({ name: 1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       data,
+//       currentDate // Optional: include current date in response
+//     });
+
+//   } catch (error) {
+//     console.error("Error fetching supervisor attendance:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+
+// // update the status 
+
+// // Update attendance status for a supervisor
+// export const updateSupervisorAttendance = async (req, res) => {
+//   try {
+//     const { supervisorId } = req.params;
+//     const { status } = req.body;
+//     const currentDate = formatCurrentDate();
+
+//     const updatedSupervisor = await Supervisor.findOneAndUpdate(
+//       { userId:supervisorId },
+//       { 
+//         $set: { 
+//           status,
+//           date: currentDate 
+//         } 
+//       },
+//       { 
+//         new: true,
+//         select: '_id name photo date status' 
+//       }
+//     );
+
+//     if (!updatedSupervisor) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Supervisor not found"
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       data: updatedSupervisor
+//     });
+
+//   } catch (error) {
+//     console.error("Error updating supervisor attendance:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+
+// // 1. Apply attendance for all supervisors based on specific date (PUT)
+// export const bulkUpdateAttendanceByDate = async (req, res) => {
+//   try {
+//     const { date, status } = req.body;
+
+//     // Validate input
+//     // if (!date || !status) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "Date and status are required"
+//     //   });
+//     // }
+
+//     // Validate status
+//     const validStatuses = ["Fullday", "Halfday", "Overtime", null];
+//     if (!validStatuses.includes(status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid status value"
+//       });
+//     }
+
+//     // Update all supervisors for the specified date
+//     const result = await Supervisor.updateMany(
+//       {},
+//       {
+//         $set: {
+//           date,
+//           status
+//         }
+//       }
+//     );
+
+//     // Get updated records
+//     const updatedSupervisors = await Supervisor.find()
+//       .select('_id userId name date status')
+//       .sort({ name: 1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `Bulk attendance updated for date: ${date}`,
+//       updatedCount: result.modifiedCount,
+//       data: updatedSupervisors
+//     });
+
+//   } catch (error) {
+//     console.error("Error in bulk attendance update by date:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+
 
 // 2. Apply attendance for all supervisors with specified status (PUT)
 export const bulkUpdateAttendanceByStatus = async (req, res) => {
@@ -667,53 +939,4 @@ export const bulkUpdateAttendanceByStatus = async (req, res) => {
   }
 };
 
-// // Function to reset attendance for all supervisors
-// const resetSupervisorAttendance = async () => {
-//   try {
-//     const today = new Date();
-//     const day = today.getDate().toString().padStart(2, '0');
-//     const month = (today.getMonth() + 1).toString().padStart(2, '0');
-//     const year = today.getFullYear();
-//     const currentDate = `${day}/${month}/${year}`;
 
-//     await Supervisor.updateMany(
-//       {}, 
-//       { 
-//         $set: { 
-//           date: currentDate,
-//           status: null 
-//         } 
-//       }
-//     );
-    
-//     console.log(`Supervisor attendance reset for date: ${currentDate}`);
-//   } catch (error) {
-//     console.error("Error resetting supervisor attendance:", error);
-//   }
-// };
-
-// // Schedule the cron job to run daily at midnight
-// cron.schedule('0 0 * * *', () => {
-//   console.log('Running daily attendance reset for supervisors...');
-//   resetSupervisorAttendance();
-// });
-
-// // Get supervisor attendance
-// export const getSupervisorAttendance = async (req, res) => {
-//   try {
-//     const data = await Supervisor.find().select('_id name photo date status');
-
-//     return res.status(200).json({
-//       success: true,
-//       data
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching supervisor attendance:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };

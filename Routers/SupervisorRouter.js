@@ -6,6 +6,7 @@ import {
    getSupervisorAttendance,
    updateSupervisorAttendance,
    bulkUpdateAttendanceByDate,
+   getAttendanceByDate,
    bulkUpdateAttendanceByStatus,
   createSupervisor,
   getAllSupervisors,
@@ -21,6 +22,7 @@ const router = express.Router();
 router.get("/supervisors/Attendance", authMiddleware, getSupervisorAttendance);
 router.put("/supervisors/Attendance/:supervisorId", authMiddleware, updateSupervisorAttendance);
 router.put('/supervisors/bulk-by-date',authMiddleware, bulkUpdateAttendanceByDate);
+router.get('/supervisors/:day/:month/:year',authMiddleware, getAttendanceByDate);
 // Apply attendance for all supervisors with specified status
 router.put('/supervisors/bulk-by-status',authMiddleware, bulkUpdateAttendanceByStatus);
 router.post("/supervisors", upload,authMiddleware, createSupervisor);
