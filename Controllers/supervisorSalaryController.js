@@ -817,6 +817,7 @@
 import mongoose from 'mongoose';
 import SupervisorSalary from '../models/SupervisorSalary.js';
 import Supervisor from '../models/Supervisor.js';
+import getNextSalaryId from '../utils/sequenceGenerator.js'; // Correct import path
 import exceljs from 'exceljs';
 import PDFDocument from 'pdfkit';
 
@@ -844,15 +845,15 @@ const getWeekNumber = (date) => {
   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
 };
 
-// Auto-increment ID generator
-const getNextSequence = async (name) => {
-  const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
-    // { _id: name },
-    // { $inc: { seq: 1 } },
-    { returnOriginal: false, upsert: true }
-  );
-  return result.value.seq;
-};
+// // Auto-increment ID generator
+// const getNextSequence = async (name) => {
+//   const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
+//     // { _id: name },
+//     // { $inc: { seq: 1 } },
+//     { returnOriginal: false, upsert: true }
+//   );
+//   return result.value.seq;
+// };
 
 // 1. Create Monthly Salary
 export const createMonthlySalary = async (req, res) => {
