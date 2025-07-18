@@ -8,6 +8,8 @@ import {
   getSupervisorById,
   updateSupervisorById,
   deleteSupervisorById,
+  // attendance
+  getSupervisorAttendance,
   upload
 } from "../Controllers/SupervisorController.js";
 
@@ -21,5 +23,8 @@ router.get("/supervisors/:id",authMiddleware, getSupervisorById);
 router.put("/supervisors/:id", upload,authMiddleware, updateSupervisorById);
 router.delete("/supervisors/:id",authMiddleware, deleteSupervisorById);
 
+
+// attendace
+router.get("/supervisors/Attendance", authMiddleware, getSupervisorAttendance);
 
 export default router;

@@ -405,3 +405,24 @@ export const deleteSupervisorById = async (req, res) => {
     });
   }
 };
+
+// for attendace
+
+export const getSupervisorAttendance = async (req, res) => {
+  try {
+    const data = await Supervisor.find();
+
+    return res.status(200).json({
+      success: true,
+      data
+    });
+
+  } catch (error) {
+    console.error("Error fetching supervisor attendance:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};

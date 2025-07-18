@@ -32,7 +32,7 @@ import centeringcontractorRouter from "./Routers/contractorRouter.js"
 import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
-import attendanceSupervisor from "./Routers/AttendanceSupervisorRouter.js"
+// import attendanceSupervisor from "./Routers/AttendanceSupervisorRouter.js"
 import supervisorSalary from "./Routers/supervisorSalaryRouter.js"
 import changePassword from "./Routers/settings.js"
 
@@ -67,7 +67,7 @@ app.use("/api",centeringcontractorRouter)
 app.use("/api",centeringWorkersRouter)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
-app.use("/api",attendanceSupervisor)
+// app.use("/api",attendanceSupervisor)
 app.use("/api",supervisorSalary)
 app.use("/api",changePassword)
 
