@@ -569,12 +569,12 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
     const { date, status } = req.body;
 
     // Validate input
-    if (!date || !status) {
-      return res.status(400).json({
-        success: false,
-        message: "Date and status are required"
-      });
-    }
+    // if (!date || !status) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Date and status are required"
+    //   });
+    // }
 
     // Validate status
     const validStatuses = ["Fullday", "Halfday", "Overtime", null];
