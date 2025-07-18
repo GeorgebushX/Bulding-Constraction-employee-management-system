@@ -1,18 +1,23 @@
 import Supervisor from "../models/CenteringSupervisor.js";
-import cron from 'node-cron';
 
-
-export const getSupervisorAttendance = async (req,res)=>{
+export const getSupervisorAttendance = async (req, res) => {
   try {
-    const data = await Supervisor.find()
-    if(!data){
-      return res.status(404).json({success:false, message:"Supervisor not found"})
-    }
-    return res.status(200).json({succss:true, data:data})
+    const data = await Supervisor.find();
+
+    return res.status(200).json({
+      success: true,
+      data
+    });
+
   } catch (error) {
-    return res.status(500).json({success:false, message:"Internal Server error"})
+    console.error("Error fetching supervisor attendance:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
   }
-}
+};
 
 
 
