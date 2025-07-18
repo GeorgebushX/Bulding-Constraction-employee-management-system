@@ -846,14 +846,14 @@ const getWeekNumber = (date) => {
 };
 
 // // Auto-increment ID generator
-// const getNextSequence = async (name) => {
-//   const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
-//     // { _id: name },
-//     // { $inc: { seq: 1 } },
-//     { returnOriginal: false, upsert: true }
-//   );
-//   return result.value.seq;
-// };
+const getNextSequence = async (name) => {
+  const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
+    { _id: name },
+    { $inc: { seq: 1 } },
+    { returnOriginal: false, upsert: true }
+  );
+  return result.value.seq;
+};
 
 // 1. Create Monthly Salary
 export const createMonthlySalary = async (req, res) => {
