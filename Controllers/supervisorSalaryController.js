@@ -806,7 +806,11 @@
 
 //     doc.end();
 //   });
-// };
+// }; 
+
+
+
+
 
 
 
@@ -843,8 +847,8 @@ const getWeekNumber = (date) => {
 // Auto-increment ID generator
 const getNextSequence = async (name) => {
   const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
-    { _id: name },
-    { $inc: { seq: 1 } },
+    // { _id: name },
+    // { $inc: { seq: 1 } },
     { returnOriginal: false, upsert: true }
   );
   return result.value.seq;
@@ -856,10 +860,10 @@ export const createMonthlySalary = async (req, res) => {
     const { name, date, actualMonthlySalary, allowances = 0, deductions = 0, advanceSalary = 0, paidAmount = 0 } = req.body;
 
     // Validate inputs
-    if (!name || !date || !actualMonthlySalary) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        message: "Name, date, and actual monthly salary are required"
+        message: "Name is required"
       });
     }
 
@@ -891,7 +895,7 @@ export const createMonthlySalary = async (req, res) => {
         Fullday: 1000,
         Halfday: 500,
         Overtime: 1500,
-        Absent: 0
+        null: 0
       };
       return total + (rates[day.status] || 0);
     }, 0);

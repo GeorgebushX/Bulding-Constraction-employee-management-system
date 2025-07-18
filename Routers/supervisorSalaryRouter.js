@@ -14,10 +14,7 @@ import {
 import authMiddleware from '../middleware/authMiddleware.js';
 const router = express.Router();
 
-// Create salary record
 router.post('/supervisors/salary',authMiddleware, createMonthlySalary);
-
-// Get all salary records
 router.get('/supervisors/salary',authMiddleware, getAllSalaries);
 
 // Get salary by ID (with optional PDF receipt)

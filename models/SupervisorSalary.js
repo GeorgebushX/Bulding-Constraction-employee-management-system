@@ -76,7 +76,19 @@ const supervisorSalarySchema = new mongoose.Schema({
     },
     Date: {
         type: String,
-    }
+    },
+     workingDays: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  totalDays: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 31
+  },
+  attendanceRecords: []
 }, { timestamps: true });
 
 // Set _id to be equal to supervisorId before validation
