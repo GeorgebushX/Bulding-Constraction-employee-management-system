@@ -449,7 +449,7 @@ const initializeAttendanceData = async () => {
       }
     );
     
-    console.log(`Attendance data initialized for date: ${currentDate}`);
+    // console.log(`Attendance data initialized for date: ${currentDate}`);
   } catch (error) {
     console.error("Error initializing attendance data:", error);
   }
