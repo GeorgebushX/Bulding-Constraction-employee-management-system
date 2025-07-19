@@ -18,7 +18,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.post('/supervisors/salary',authMiddleware, createMonthlySalary);
-router.get('/supervisors/salaries',authMiddleware, getAllSalaries);
+router.get('/supervisors/salary',authMiddleware, getAllSalaries);
 router.post('/supervisors/salary/bulk',authMiddleware, assignSalaryToAllSupervisors);
 router.get('/supervisors/salary/:day/:month/:year',authMiddleware, getSalariesByDate);
 router.get('/supervisors/salary/:month/:year',authMiddleware, getSalariesByMonthYear);
