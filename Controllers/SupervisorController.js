@@ -605,8 +605,7 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
 // Get attendance details for a specific date
 export const getAttendanceByDate = async (req, res) => {
   try {
-    // const { date } = req.params;
-     // Combine day, month, year into DD/MM/YYYY format
+    
     const date = `${req.params.day}/${req.params.month}/${req.params.year}`;
 
     // Validate date format (DD/MM/YYYY)
