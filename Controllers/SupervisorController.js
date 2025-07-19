@@ -1,4 +1,4 @@
-// controllers/supervisorController.js
+
 import Supervisor from "../models/Supervisor.js";
 import User from "../models/User.js";
 import Site from "../models/SiteDetails.js";
@@ -7,6 +7,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import cron from 'node-cron';
+import exceljs from 'exceljs';
+import pdfkit from 'pdfkit';
 
 
 // Ensure upload directory exists
@@ -414,11 +416,6 @@ export const deleteSupervisorById = async (req, res) => {
 
 
 
-
-
-
-
-
 // Helper function to format date as DD/MM/YYYY
 const formatCurrentDate = () => {
   const date = new Date();
@@ -691,204 +688,6 @@ export const getAttendanceByDate = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-// // Helper function to format date as DD/MM/YYYY
-// const formatCurrentDate = () => {
-//   const date = new Date();
-//   const day = date.getDate().toString().padStart(2, '0');
-//   const month = (date.getMonth() + 1).toString().padStart(2, '0');
-//   const year = date.getFullYear();
-//   return `${day}/${month}/${year}`;
-// };
-
-// // Initialize or reset attendance data
-// const initializeAttendanceData = async () => {
-//   try {
-//     const currentDate = formatCurrentDate();
-    
-//     // Update all supervisors with missing date or outdated date
-//     await Supervisor.updateMany(
-//       {
-//         $or: [
-//           { date: { $ne: currentDate } },
-//           { date: { $exists: false } }
-//         ]
-//       },
-//       {
-//         $set: {
-//           date: currentDate,
-//           status: null
-//         }
-//       }
-//     );
-    
-//     console.log(`Attendance data initialized for date: ${currentDate}`);
-//   } catch (error) {
-//     console.error("Error initializing attendance data:", error);
-//   }
-// };
-
-// // Run initialization on server start
-// initializeAttendanceData();
-
-// // Schedule daily reset at midnight
-// cron.schedule('0 0 * * *', initializeAttendanceData);
-
-// // Get all supervisors with attendance data
-// export const getSupervisorAttendance = async (req, res) => {
-//   try {
-//     const currentDate = formatCurrentDate();
-    
-//     // First ensure all records have today's date
-//     await Supervisor.updateMany(
-//       {
-//         $or: [
-//           { date: { $ne: currentDate } },
-//           { date: { $exists: false } }
-//         ]
-//       },
-//       {
-//         $set: {
-//           date: currentDate,
-//           status: null
-//         }
-//       }
-//     );
-
-//     // Then fetch all supervisors
-//     const data = await Supervisor.find()
-//       .select('_id name photo date status')
-//       .sort({ name: 1 });
-
-//     return res.status(200).json({
-//       success: true,
-//       data,
-//       currentDate // Optional: include current date in response
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching supervisor attendance:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
-
-
-// // update the status 
-
-// // Update attendance status for a supervisor
-// export const updateSupervisorAttendance = async (req, res) => {
-//   try {
-//     const { supervisorId } = req.params;
-//     const { status } = req.body;
-//     const currentDate = formatCurrentDate();
-
-//     const updatedSupervisor = await Supervisor.findOneAndUpdate(
-//       { userId:supervisorId },
-//       { 
-//         $set: { 
-//           status,
-//           date: currentDate 
-//         } 
-//       },
-//       { 
-//         new: true,
-//         select: '_id name photo date status' 
-//       }
-//     );
-
-//     if (!updatedSupervisor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Supervisor not found"
-//       });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       data: updatedSupervisor
-//     });
-
-//   } catch (error) {
-//     console.error("Error updating supervisor attendance:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
-
-
-// // 1. Apply attendance for all supervisors based on specific date (PUT)
-// export const bulkUpdateAttendanceByDate = async (req, res) => {
-//   try {
-//     const { date, status } = req.body;
-
-//     // Validate input
-//     // if (!date || !status) {
-//     //   return res.status(400).json({
-//     //     success: false,
-//     //     message: "Date and status are required"
-//     //   });
-//     // }
-
-//     // Validate status
-//     const validStatuses = ["Fullday", "Halfday", "Overtime", null];
-//     if (!validStatuses.includes(status)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid status value"
-//       });
-//     }
-
-//     // Update all supervisors for the specified date
-//     const result = await Supervisor.updateMany(
-//       {},
-//       {
-//         $set: {
-//           date,
-//           status
-//         }
-//       }
-//     );
-
-//     // Get updated records
-//     const updatedSupervisors = await Supervisor.find()
-//       .select('_id userId name date status')
-//       .sort({ name: 1 });
-
-//     return res.status(200).json({
-//       success: true,
-//       message: `Bulk attendance updated for date: ${date}`,
-//       updatedCount: result.modifiedCount,
-//       data: updatedSupervisors
-//     });
-
-//   } catch (error) {
-//     console.error("Error in bulk attendance update by date:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
-
-
-
 // 2. Apply attendance for all supervisors with specified status (PUT)
 export const bulkUpdateAttendanceByStatus = async (req, res) => {
   try {
@@ -938,4 +737,564 @@ export const bulkUpdateAttendanceByStatus = async (req, res) => {
   }
 };
 
+
+// pdf and Excel sheet to download:
+
+
+// Helper function to format date as DD/MM/YYYY
+// const formatCurrentDate = () => {
+//   const date = new Date();
+//   const day = date.getDate().toString().padStart(2, '0');
+//   const month = (date.getMonth() + 1).toString().padStart(2, '0');
+//   const year = date.getFullYear();
+//   return `${day}/${month}/${year}`;
+// };
+
+// Helper function to get week range
+const getWeekRange = () => {
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7; // Adjust so Monday is 1, Sunday is 7
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dayOfWeek + 1);
+  
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() + (7 - dayOfWeek));
+  
+  const format = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  
+  return {
+    start: format(monday),
+    end: format(sunday),
+    current: format(now)
+  };
+};
+
+// Generate Daily Report
+export const getDailyReport = async (req, res) => {
+  try {
+    const { DD, MM, YYYY } = req.params;
+    const date = `${DD}/${MM}/${YYYY}`;
+    const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
+
+    // Validate date format
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Please use DD/MM/YYYY"
+      });
+    }
+
+    // Get attendance data for the specified date
+    const supervisors = await Supervisor.aggregate([
+      {
+        $match: {
+          $or: [
+            { 'currentAttendance.date': date },
+            { 'attendanceRecords.date': date }
+          ]
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          currentStatus: {
+            $cond: {
+              if: { $eq: ['$currentAttendance.date', date] },
+              then: '$currentAttendance.status',
+              else: null
+            }
+          },
+          historicalStatus: {
+            $let: {
+              vars: {
+                filteredRecords: {
+                  $filter: {
+                    input: '$attendanceRecords',
+                    as: 'record',
+                    cond: { $eq: ['$$record.date', date] }
+                  }
+                }
+              },
+              in: { $arrayElemAt: ['$$filteredRecords.status', 0] }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          status: {
+            $cond: {
+              if: { $ne: ['$currentStatus', null] },
+              then: '$currentStatus',
+              else: '$historicalStatus'
+            }
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    if (format === 'json') {
+      return res.status(200).json({
+        success: true,
+        data: supervisors,
+        date,
+        reportType: 'daily'
+      });
+    } else if (format === 'excel') {
+      // Create Excel workbook
+      const workbook = new exceljs.Workbook();
+      const worksheet = workbook.addWorksheet('Daily Attendance Report');
+      
+      // Add headers
+      worksheet.columns = [
+        { header: 'ID', key: 'userId', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Status', key: 'status', width: 15 }
+      ];
+      
+      // Add data
+      supervisors.forEach(supervisor => {
+        worksheet.addRow({
+          userId: supervisor.userId,
+          name: supervisor.name,
+          status: supervisor.status || 'Not Recorded'
+        });
+      });
+      
+      // Set response headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=daily_report_${DD}_${MM}_${YYYY}.xlsx`
+      );
+      
+      // Send the workbook
+      return workbook.xlsx.write(res).then(() => {
+        res.end();
+      });
+    } else if (format === 'pdf') {
+      // Create PDF document
+      const doc = new pdfkit();
+      const filename = `daily_report_${DD}_${MM}_${YYYY}.pdf`;
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+      
+      // Add content
+      doc.fontSize(18).text(`Daily Attendance Report - ${date}`, { align: 'center' });
+      doc.moveDown();
+      
+      doc.fontSize(12);
+      supervisors.forEach((supervisor, index) => {
+        doc.text(`${index + 1}. ${supervisor.name} - ${supervisor.status || 'Not Recorded'}`);
+        doc.moveDown(0.5);
+      });
+      
+      // Finalize PDF
+      doc.end();
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid format parameter. Use json, excel, or pdf"
+      });
+    }
+  } catch (error) {
+    console.error("Error generating daily report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+// // Generate Weekly Report
+
+
+// Helper function to get week range within a month
+const getWeekRangeInMonth = (year, month, weekNumber) => {
+  // Create date for the first day of the month
+  const firstDay = new Date(year, month - 1, 1);
+  
+  // Calculate the first Monday of the month
+  let firstMonday = new Date(firstDay);
+  firstMonday.setDate(1 + ((8 - firstDay.getDay()) % 7));
+  
+  // Adjust for weeks starting on Sunday (if needed)
+  // For Monday-starting weeks (ISO standard), use the above
+  // For Sunday-starting weeks, use:
+  // let firstSunday = new Date(firstDay);
+  // firstSunday.setDate(1 - firstDay.getDay());
+  
+  // Calculate start and end dates for the requested week
+  const startDate = new Date(firstMonday);
+  startDate.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  
+  // Format dates as DD/MM/YYYY
+  const format = (date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  
+  return {
+    start: format(startDate),
+    end: format(endDate),
+    month: month.toString().padStart(2, '0'),
+    year: year.toString(),
+    weekNumber
+  };
+};
+
+// Generate Weekly Report within a specific month
+export const getWeeklyReport = async (req, res) => {
+  try {
+    const { MM, YYYY, week } = req.params;
+    const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
+    
+    // Validate week number (01-04)
+    const weekNumber = parseInt(week);
+    if (weekNumber < 1 || weekNumber > 4) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid week number. Please use 01-04 for weeks in the month"
+      });
+    }
+    
+    // Validate month/year format
+    const monthYear = `${MM}/${YYYY}`;
+    if (!/^\d{2}\/\d{4}$/.test(monthYear)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid month/year format. Please use MM/YYYY"
+      });
+    }
+    
+    // Get week range for the specified week in the month
+    const weekRange = getWeekRangeInMonth(parseInt(YYYY), parseInt(MM), weekNumber);
+    
+    // Get attendance data for the week
+    const supervisors = await Supervisor.aggregate([
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          currentAttendance: 1,
+          weeklyRecords: {
+            $filter: {
+              input: '$attendanceRecords',
+              as: 'record',
+              cond: {
+                $and: [
+                  { $gte: ['$$record.date', weekRange.start] },
+                  { $lte: ['$$record.date', weekRange.end] }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          daysPresent: {
+            $size: {
+              $filter: {
+                input: '$weeklyRecords',
+                as: 'record',
+                cond: { $ne: ['$$record.status', null] }
+              }
+            }
+          },
+          totalDays: {
+            $size: '$weeklyRecords'
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    if (format === 'json') {
+      return res.status(200).json({
+        success: true,
+        data: supervisors,
+        weekRange,
+        reportType: 'weekly',
+        weekInfo: {
+          month: weekRange.month,
+          year: weekRange.year,
+          weekNumber: weekRange.weekNumber
+        }
+      });
+    } else if (format === 'excel') {
+      // Create Excel workbook
+      const workbook = new exceljs.Workbook();
+      const worksheet = workbook.addWorksheet('Weekly Attendance Report');
+      
+      // Add headers
+      worksheet.columns = [
+        { header: 'ID', key: 'userId', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Days Present', key: 'daysPresent', width: 15 },
+        { header: 'Total Days', key: 'totalDays', width: 15 },
+        { header: 'Attendance Rate', key: 'attendanceRate', width: 20 }
+      ];
+      
+      // Add data
+      supervisors.forEach(supervisor => {
+        const attendanceRate = supervisor.totalDays > 0 
+          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        worksheet.addRow({
+          userId: supervisor.userId,
+          name: supervisor.name,
+          daysPresent: supervisor.daysPresent,
+          totalDays: supervisor.totalDays,
+          attendanceRate
+        });
+      });
+      
+      // Set response headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.xlsx`
+      );
+      
+      // Send the workbook
+      return workbook.xlsx.write(res).then(() => {
+        res.end();
+      });
+    } else if (format === 'pdf') {
+      // Create PDF document
+      const doc = new pdfkit();
+      const filename = `weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.pdf`;
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+      
+      // Add content
+      doc.fontSize(18).text(
+        `Weekly Attendance Report - ${weekRange.month}/${weekRange.year} (Week ${weekRange.weekNumber})`, 
+        { align: 'center' }
+      );
+      doc.fontSize(14).text(
+        `Date Range: ${weekRange.start} to ${weekRange.end}`,
+        { align: 'center' }
+      );
+      doc.moveDown();
+      
+      doc.fontSize(12);
+      supervisors.forEach((supervisor, index) => {
+        const attendanceRate = supervisor.totalDays > 0 
+          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        doc.text(`${index + 1}. ${supervisor.name}`);
+        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.moveDown(0.5);
+      });
+      
+      // Finalize PDF
+      doc.end();
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid format parameter. Use json, excel, or pdf"
+      });
+    }
+  } catch (error) {
+    console.error("Error generating weekly report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+// Generate Monthly Report
+export const getMonthlyReport = async (req, res) => {
+  try {
+    const { MM, YYYY } = req.params;
+    const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
+    const monthYear = `${MM}/${YYYY}`;
+
+    // Validate month/year format
+    if (!/^\d{2}\/\d{4}$/.test(monthYear)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid month/year format. Please use MM/YYYY"
+      });
+    }
+
+    // Get attendance data for the month
+    const supervisors = await Supervisor.aggregate([
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          currentAttendance: 1,
+          monthlyRecords: {
+            $filter: {
+              input: '$attendanceRecords',
+              as: 'record',
+              cond: {
+                $eq: [
+                  { $substr: ['$$record.date', 3, 7] }, // Extract MM/YYYY from DD/MM/YYYY
+                  monthYear
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          daysPresent: {
+            $size: {
+              $filter: {
+                input: '$monthlyRecords',
+                as: 'record',
+                cond: { $ne: ['$$record.status', null] }
+              }
+            }
+          },
+          totalDays: {
+            $size: '$monthlyRecords'
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    if (format === 'json') {
+      return res.status(200).json({
+        success: true,
+        data: supervisors,
+        monthYear,
+        reportType: 'monthly'
+      });
+    } else if (format === 'excel') {
+      // Create Excel workbook
+      const workbook = new exceljs.Workbook();
+      const worksheet = workbook.addWorksheet('Monthly Attendance Report');
+      
+      // Add headers
+      worksheet.columns = [
+        { header: 'ID', key: 'userId', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Days Present', key: 'daysPresent', width: 15 },
+        { header: 'Total Days', key: 'totalDays', width: 15 },
+        { header: 'Attendance Rate', key: 'attendanceRate', width: 20 }
+      ];
+      
+      // Add data
+      supervisors.forEach(supervisor => {
+        const attendanceRate = supervisor.totalDays > 0 
+          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        worksheet.addRow({
+          userId: supervisor.userId,
+          name: supervisor.name,
+          daysPresent: supervisor.daysPresent,
+          totalDays: supervisor.totalDays,
+          attendanceRate
+        });
+      });
+      
+      // Set response headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=monthly_report_${MM}_${YYYY}.xlsx`
+      );
+      
+      // Send the workbook
+      return workbook.xlsx.write(res).then(() => {
+        res.end();
+      });
+    } else if (format === 'pdf') {
+      // Create PDF document
+      const doc = new pdfkit();
+      const filename = `monthly_report_${MM}_${YYYY}.pdf`;
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+      
+      // Add content
+      doc.fontSize(18).text(`Monthly Attendance Report - ${MM}/${YYYY}`, { align: 'center' });
+      doc.moveDown();
+      
+      doc.fontSize(12);
+      supervisors.forEach((supervisor, index) => {
+        const attendanceRate = supervisor.totalDays > 0 
+          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        doc.text(`${index + 1}. ${supervisor.name}`);
+        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.moveDown(0.5);
+      });
+      
+      // Finalize PDF
+      doc.end();
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid format parameter. Use json, excel, or pdf"
+      });
+    }
+  } catch (error) {
+    console.error("Error generating monthly report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
 

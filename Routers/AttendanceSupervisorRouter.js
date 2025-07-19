@@ -101,13 +101,13 @@
 // // router.post('/attendance/apply-to-all',authMiddleware, applyStatusToAll);
 
 
-// // // Report routes
-// // router.get('/reports/daily', authMiddleware, getDailyReport);
-// // // API METHOD: https://bulding-constraction-employee-management.onrender.com/api/reports/daily?date=2025-07-09
-// // router.get('/reports/weekly', authMiddleware, getWeeklyReport);
-// // // API METHOD:https://bulding-constraction-employee-management.onrender.com/api/reports/weekly?date=2025-07-09
-// // router.get('/reports/monthly', authMiddleware, getMonthlyReport);
-// // // API METHOD: https://bulding-constraction-employee-management.onrender.com/api/reports/monthly?year=2025&month=07
+// // Report routes
+// router.get('/reports/daily', authMiddleware, getDailyReport);
+// // API METHOD: https://bulding-constraction-employee-management.onrender.com/api/reports/daily?date=2025-07-09
+// router.get('/reports/weekly', authMiddleware, getWeeklyReport);
+// // API METHOD:https://bulding-constraction-employee-management.onrender.com/api/reports/weekly?date=2025-07-09
+// router.get('/reports/monthly', authMiddleware, getMonthlyReport);
+// // API METHOD: https://bulding-constraction-employee-management.onrender.com/api/reports/monthly?year=2025&month=07
 
 
 

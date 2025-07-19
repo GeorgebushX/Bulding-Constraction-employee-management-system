@@ -139,7 +139,7 @@ const attendanceRecordSchema = new mongoose.Schema({
   date: { type: String, required: true },
   status: {
     type: String,
-    enum: ["Fullday", "Halfday", "Overtime", "Absent"],
+    enum: ["Fullday", "Halfday", "Overtime", null],
     required: true
   },
   recordedAt: { type: Date, default: Date.now }
