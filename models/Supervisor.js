@@ -142,8 +142,23 @@ const attendanceRecordSchema = new mongoose.Schema({
     enum: ["Fullday", "Halfday", "Overtime", null],
     required: true
   },
-  recordedAt: { type: Date, default: Date.now }
+  recordedAt: { type: Date, 
+    default: Date.now,
+    get: formatDateToDDMMYYYY
+  }
 }, { _id: false });
+
+
+// Helper function to format dates as DD/MM/YYYY
+function formatDateToDDMMYYYY(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 
 const supervisorSchema = new mongoose.Schema({
   _id: Number, // Will be the same as userId

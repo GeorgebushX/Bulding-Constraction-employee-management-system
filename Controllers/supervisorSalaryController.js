@@ -686,6 +686,16 @@ export const getSalariesByMonthYear = async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
 // 6. Delete All Salaries
 export const deleteAllSalaries = async (req, res) => {
   try {
