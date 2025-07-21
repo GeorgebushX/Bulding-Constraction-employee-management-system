@@ -5,10 +5,12 @@ import {
   getSalariesByDate,
   getSalariesByMonthYear,
   getAllSalaries,
+  getAllSupervisorSalaries,
   getSalaryById,
   updateSalary,
   deleteSalaryById,
   deleteAllSalaries,
+  getSalaryReport,
   generateDailyReport,
   generateMonthlyReport,
   generateYearlyReport
@@ -29,7 +31,10 @@ router.put('/supervisors/salary/:id',authMiddleware, updateSalary);
 router.delete('/supervisors/salary/:id',authMiddleware, deleteSalaryById);
 // Delete all salary records
 router.delete('/supervisors/salary',authMiddleware, deleteAllSalaries);
+router.get('/supervisors/salaries',  getAllSupervisorSalaries);
 // Reports
+router.get('/supervisors/salaries/reports', getSalaryReport);
+//optional
 router.get('/supervisors/salary/reports/daily/:DD/:MM/:YYYY',authMiddleware, generateDailyReport);
 // router.get('/supervisors/salary/reports/weekly/:MM/:YYYY/:week',authMiddleware, generateWeeklyReport);
 router.get('/supervisors/salary/reports/monthly/:MM/:YYYY',authMiddleware, generateMonthlyReport);

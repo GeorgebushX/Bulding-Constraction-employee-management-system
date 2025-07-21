@@ -714,6 +714,438 @@ export const deleteAllSalaries = async (req, res) => {
 
 
 
+// Helper function to generate Excel report
+const generateExcelSalaryReport = async (res, salaries, title = 'Salary Report') => {
+  try {
+    const workbook = new exceljs.Workbook();
+    const worksheet = workbook.addWorksheet('Salary Report');
+
+    // Add title and date
+    worksheet.addRow([title]);
+    worksheet.addRow(['Generated on:', new Date().toLocaleString()]);
+    worksheet.addRow([]);
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Supervisor Name', key: 'name', width: 25 },
+      { header: 'Month', key: 'month', width: 15 },
+      { header: 'Year', key: 'year', width: 10 },
+      { header: 'Basic Salary', key: 'basicSalary', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Allowances', key: 'allowances', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Deductions', key: 'deductions', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Net Salary', key: 'netMonthlySalary', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Paid Amount', key: 'paidAmount', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Advance', key: 'advanceSalary', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Balance', key: 'balanceAmount', width: 15, style: { numFmt: '"₹"#,##0.00' } },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Working Days', key: 'workingDays', width: 15 },
+      { header: 'Total Days', key: 'totalDays', width: 15 }
+    ];
+
+    // Add data rows
+    salaries.forEach(salary => {
+      worksheet.addRow({
+        name: salary.supervisorId?.name || 'Unknown',
+        month: salary.monthName,
+        year: salary.year,
+        basicSalary: salary.basicSalary,
+        allowances: salary.allowances,
+        deductions: salary.deductions,
+        netMonthlySalary: salary.netMonthlySalary,
+        paidAmount: salary.paidAmount,
+        advanceSalary: salary.advanceSalary,
+        balanceAmount: salary.balanceAmount,
+        status: salary.status,
+        workingDays: salary.workingDays,
+        totalDays: salary.totalDays
+      });
+    });
+
+    // Add summary row
+    worksheet.addRow([]);
+    const summaryRow = worksheet.addRow([
+      'TOTAL', 
+      '', 
+      '',
+      { formula: `SUM(D4:D${worksheet.rowCount - 1})` },
+      { formula: `SUM(E4:E${worksheet.rowCount - 1})` },
+      { formula: `SUM(F4:F${worksheet.rowCount - 1})` },
+      { formula: `SUM(G4:G${worksheet.rowCount - 1})` },
+      { formula: `SUM(H4:H${worksheet.rowCount - 1})` },
+      { formula: `SUM(I4:I${worksheet.rowCount - 1})` },
+      { formula: `SUM(J4:J${worksheet.rowCount - 1})` },
+      '',
+      { formula: `SUM(L4:L${worksheet.rowCount - 1})` },
+      { formula: `SUM(M4:M${worksheet.rowCount - 1})` }
+    ]);
+    
+    summaryRow.font = { bold: true };
+    summaryRow.eachCell(cell => {
+      if (cell.value && typeof cell.value === 'object' && cell.value.formula) {
+        cell.numFmt = '"₹"#,##0.00';
+      }
+    });
+
+    // Style the header row
+    worksheet.getRow(4).eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD3D3D3' }
+      };
+    });
+
+    // Set response headers
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=supervisor_salaries_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+
+    // Write to response
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error("Error generating Excel report:", error);
+    throw error;
+  }
+};
+
+// Helper function to generate PDF report
+const generatePdfSalaryReport = async (res, salaries, title = 'Salary Report') => {
+  try {
+    const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'landscape' });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=supervisor_salaries_${new Date().toISOString().split('T')[0]}.pdf`
+    );
+
+    doc.pipe(res);
+
+    // Add title
+    doc.fontSize(18).text(title, { align: 'center' });
+    doc.fontSize(10).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // Define table parameters
+    const table = {
+      headers: [
+        'Supervisor',
+        'Month',
+        'Year',
+        'Basic Salary',
+        'Allowances',
+        'Deductions',
+        'Net Salary',
+        'Paid',
+        'Advance',
+        'Balance',
+        'Status',
+        'Work Days'
+      ],
+      rows: [],
+      columnWidths: [100, 60, 50, 80, 70, 70, 80, 70, 70, 70, 60, 60],
+      align: ['left', 'center', 'center', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'center', 'center']
+    };
+
+    // Add data rows
+    salaries.forEach(salary => {
+      table.rows.push([
+        salary.supervisorId?.name || 'Unknown',
+        salary.monthName,
+        salary.year.toString(),
+        `₹${salary.basicSalary.toFixed(2)}`,
+        `₹${salary.allowances.toFixed(2)}`,
+        `₹${salary.deductions.toFixed(2)}`,
+        `₹${salary.netMonthlySalary.toFixed(2)}`,
+        `₹${salary.paidAmount.toFixed(2)}`,
+        `₹${salary.advanceSalary.toFixed(2)}`,
+        `₹${salary.balanceAmount.toFixed(2)}`,
+        salary.status,
+        `${salary.workingDays}/${salary.totalDays}`
+      ]);
+    });
+
+    // Calculate totals for footer
+    const totals = {
+      basicSalary: salaries.reduce((sum, s) => sum + s.basicSalary, 0),
+      allowances: salaries.reduce((sum, s) => sum + s.allowances, 0),
+      deductions: salaries.reduce((sum, s) => sum + s.deductions, 0),
+      netMonthlySalary: salaries.reduce((sum, s) => sum + s.netMonthlySalary, 0),
+      paidAmount: salaries.reduce((sum, s) => sum + s.paidAmount, 0),
+      advanceSalary: salaries.reduce((sum, s) => sum + s.advanceSalary, 0),
+      balanceAmount: salaries.reduce((sum, s) => sum + s.balanceAmount, 0),
+      workingDays: salaries.reduce((sum, s) => sum + s.workingDays, 0),
+      totalDays: salaries.reduce((sum, s) => sum + s.totalDays, 0)
+    };
+
+    // Draw table
+    let y = doc.y;
+    const rowHeight = 20;
+    const x = 50;
+
+    // Draw headers
+    doc.font('Helvetica-Bold');
+    table.headers.forEach((header, i) => {
+      doc.text(header, x + (i > 0 ? table.columnWidths.slice(0, i).reduce((a, b) => a + b, 0) : 0), y, {
+        width: table.columnWidths[i],
+        align: table.align[i]
+      });
+    });
+    doc.font('Helvetica');
+
+    // Draw rows
+    y += rowHeight;
+    table.rows.forEach(row => {
+      row.forEach((cell, i) => {
+        doc.text(cell, x + (i > 0 ? table.columnWidths.slice(0, i).reduce((a, b) => a + b, 0) : 0), y, {
+          width: table.columnWidths[i],
+          align: table.align[i]
+        });
+      });
+      y += rowHeight;
+    });
+
+    // Draw footer with totals
+    y += rowHeight;
+    doc.font('Helvetica-Bold');
+    doc.text('TOTALS:', x, y);
+    doc.text(`₹${totals.basicSalary.toFixed(2)}`, x + table.columnWidths.slice(0, 3).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[3],
+      align: 'right'
+    });
+    doc.text(`₹${totals.allowances.toFixed(2)}`, x + table.columnWidths.slice(0, 4).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[4],
+      align: 'right'
+    });
+    doc.text(`₹${totals.deductions.toFixed(2)}`, x + table.columnWidths.slice(0, 5).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[5],
+      align: 'right'
+    });
+    doc.text(`₹${totals.netMonthlySalary.toFixed(2)}`, x + table.columnWidths.slice(0, 6).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[6],
+      align: 'right'
+    });
+    doc.text(`₹${totals.paidAmount.toFixed(2)}`, x + table.columnWidths.slice(0, 7).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[7],
+      align: 'right'
+    });
+    doc.text(`₹${totals.advanceSalary.toFixed(2)}`, x + table.columnWidths.slice(0, 8).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[8],
+      align: 'right'
+    });
+    doc.text(`₹${totals.balanceAmount.toFixed(2)}`, x + table.columnWidths.slice(0, 9).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[9],
+      align: 'right'
+    });
+    doc.text(`${totals.workingDays}/${totals.totalDays}`, x + table.columnWidths.slice(0, 11).reduce((a, b) => a + b, 0), y, {
+      width: table.columnWidths[11],
+      align: 'center'
+    });
+
+    doc.end();
+
+  } catch (error) {
+    console.error("Error generating PDF report:", error);
+    throw error;
+  }
+};
+
+// Get salary report with flexible date range and format
+export const getSalaryReport = async (req, res) => {
+  try {
+    const { month, year, supervisorId } = req.query;
+    const { format = 'json' } = req.query;
+
+    // Validate format
+    const validFormats = ['json', 'excel', 'pdf'];
+    if (!validFormats.includes(format)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid format parameter. Use json, excel, or pdf"
+      });
+    }
+
+    // Build query
+    const query = {};
+    if (month) query.month = parseInt(month);
+    if (year) query.year = parseInt(year);
+    if (supervisorId) {
+      if (mongoose.Types.ObjectId.isValid(supervisorId)) {
+        query.supervisorId = supervisorId;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid supervisorId format"
+        });
+      }
+    }
+
+    // Get salary data with supervisor details
+    const salaries = await SupervisorSalary.find(query)
+      .populate({
+        path: 'supervisorId',
+        select: 'name email phone supervisorType',
+        model: 'Supervisor',
+        options: { allowNull: true }
+      })
+      .sort({ year: -1, month: -1, 'supervisorId.name': 1 })
+      .lean();
+
+    if (format === 'json') {
+      return res.status(200).json({
+        success: true,
+        count: salaries.length,
+        data: salaries,
+        filters: { month, year, supervisorId },
+        reportType: 'salary'
+      });
+    } else if (format === 'excel') {
+      let title = 'Supervisor Salaries Report';
+      if (month && year) {
+        title = `Supervisor Salaries - ${getMonthName(parseInt(month))} ${year}`;
+      } else if (year) {
+        title = `Supervisor Salaries - Year ${year}`;
+      }
+      return generateExcelSalaryReport(res, salaries, title);
+    } else if (format === 'pdf') {
+      let title = 'Supervisor Salaries Report';
+      if (month && year) {
+        title = `Supervisor Salaries - ${getMonthName(parseInt(month))} ${year}`;
+      } else if (year) {
+        title = `Supervisor Salaries - Year ${year}`;
+      }
+      return generatePdfSalaryReport(res, salaries, title);
+    }
+
+  } catch (error) {
+    console.error("Error generating salary report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+// Add this to your router
+// router.get('/supervisors/salaries/reports', authMiddleware, getSalaryReport);
+
+
+// get all salaries
+
+// 2. Get All Salary Records (with robust supervisor handling and report generation)
+export const getAllSupervisorSalaries = async (req, res) => {
+    try {
+        const { format = 'json', month, year, status } = req.query;
+
+        // Validate format
+        const validFormats = ['json', 'excel', 'pdf'];
+        if (!validFormats.includes(format)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid format parameter. Use json, excel, or pdf"
+            });
+        }
+
+        // Build query
+        const query = {};
+        if (month) query.month = parseInt(month);
+        if (year) query.year = parseInt(year);
+        if (status) query.status = status;
+
+        // Get all salaries with supervisor population
+        const salaries = await SupervisorSalary.find(query)
+            .populate({
+                path: 'supervisorId',
+                select: 'name email phone supervisorType',
+                model: 'Supervisor',
+                options: { allowNull: true }
+            })
+            .sort({ year: -1, month: -1, 'supervisorId.name': 1 })
+            .lean();
+
+        // Transform data with null checks
+        const responseData = salaries.map(salary => {
+            // Handle case where supervisor is deleted but reference exists
+            const supervisorData = salary.supervisorId ? {
+                _id: salary.supervisorId._id,
+                name: salary.supervisorId.name || 'Deleted Supervisor',
+                email: salary.supervisorId.email || null,
+                phone: salary.supervisorId.phone || null,
+                supervisorType: salary.supervisorId.supervisorType || null
+            } : {
+                _id: null,
+                name: 'Unknown Supervisor',
+                email: null,
+                phone: null,
+                supervisorType: null
+            };
+
+            return {
+                ...salary,
+                supervisorId: supervisorData
+            };
+        });
+
+        // Handle different output formats
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                count: responseData.length,
+                data: responseData,
+                filters: { month, year, status },
+                reportType: 'salary'
+            });
+        } else if (format === 'excel') {
+            let title = 'All Supervisor Salaries';
+            if (month && year) {
+                title = `Supervisor Salaries - ${getMonthName(parseInt(month))} ${year}`;
+            } else if (year) {
+                title = `Supervisor Salaries - Year ${year}`;
+            }
+            if (status) {
+                title += ` (${status})`;
+            }
+            return generateExcelSalaryReport(res, responseData, title);
+        } else if (format === 'pdf') {
+            let title = 'All Supervisor Salaries';
+            if (month && year) {
+                title = `Supervisor Salaries - ${getMonthName(parseInt(month))} ${year}`;
+            } else if (year) {
+                title = `Supervisor Salaries - Year ${year}`;
+            }
+            if (status) {
+                title += ` (${status})`;
+            }
+            return generatePdfSalaryReport(res, responseData, title);
+        }
+
+    } catch (error) {
+        console.error("Error fetching all salaries:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message.includes('Cast to ObjectId failed') 
+                ? 'Invalid supervisor reference format' 
+                : error.message
+        });
+    }
+};
+
+
+
+
+
+
+
 
 
 
