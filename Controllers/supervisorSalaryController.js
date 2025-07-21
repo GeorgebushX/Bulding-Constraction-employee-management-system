@@ -215,40 +215,40 @@ export const getAllSalaries = async (req, res) => {
     }
 };
 
-// 3. Get Salary by ID
-export const getSalaryById = async (req, res) => {
-    try {
-        const salary = await SupervisorSalary.findById(req.params.id)
-            .populate('supervisorId', 'name email phone supervisorType');
+// // 3. Get Salary by ID
+// export const getSalaryById = async (req, res) => {
+//     try {
+//         const salary = await SupervisorSalary.findById(req.params.id)
+//             .populate('supervisorId', 'name email phone supervisorType');
 
-        if (!salary) {
-            return res.status(404).json({
-                success: false,
-                message: "Salary record not found"
-            });
-        }
+//         if (!salary) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Salary record not found"
+//             });
+//         }
 
-        res.status(200).json({
-            success: true,
-            data: {
-                ...salary.toObject(),
-                supervisorId: {
-                    _id: salary.supervisorId._id,
-                    name: salary.supervisorId.name,
-                    email: salary.supervisorId.email,
-                    phone: salary.supervisorId.phone,
-                    supervisorType: salary.supervisorId.supervisorType
-                }
-            }
-        });
+//         res.status(200).json({
+//             success: true,
+//             data: {
+//                 ...salary.toObject(),
+//                 supervisorId: {
+//                     _id: salary.supervisorId._id,
+//                     name: salary.supervisorId.name,
+//                     email: salary.supervisorId.email,
+//                     phone: salary.supervisorId.phone,
+//                     supervisorType: salary.supervisorId.supervisorType
+//                 }
+//             }
+//         });
 
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: error.message
+//         });
+//     }
+// };
 
 // 4. Update Salary Record
 export const updateSalary = async (req, res) => {
@@ -684,18 +684,6 @@ export const getSalariesByMonthYear = async (req, res) => {
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 // 6. Delete All Salaries
 export const deleteAllSalaries = async (req, res) => {
   try {
@@ -719,895 +707,653 @@ export const deleteAllSalaries = async (req, res) => {
   }
 };
 
-// 7. Generate Daily Report
+
+
+
+
+
+
+
+
+
+
+// Generate PDF Receipt for Salary
+export const getSalaryById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const format = req.query.format || 'json'; // Default to JSON, options: json, pdf
+
+        const salary = await SupervisorSalary.findById(id)
+            .populate('supervisorId', 'name email phone supervisorType');
+
+        if (!salary) {
+            return res.status(404).json({
+                success: false,
+                message: "Salary record not found"
+            });
+        }
+
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    ...salary.toObject(),
+                    supervisorId: {
+                        _id: salary.supervisorId._id,
+                        name: salary.supervisorId.name,
+                        email: salary.supervisorId.email,
+                        phone: salary.supervisorId.phone,
+                        supervisorType: salary.supervisorId.supervisorType
+                    }
+                }
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument();
+            const filename = `salary_receipt_${salary._id}.pdf`;
+            
+            // Set response headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            
+            // Pipe PDF to response
+            doc.pipe(res);
+            
+            // Add content
+            doc.fontSize(18).text('Salary Receipt', { align: 'center' });
+            doc.moveDown();
+            
+            doc.fontSize(12);
+            doc.text(`Receipt ID: ${salary._id}`);
+            doc.text(`Date: ${salary.date}`);
+            doc.moveDown();
+            
+            doc.text(`Supervisor: ${salary.supervisorId.name}`);
+            doc.text(`Type: ${salary.supervisorId.supervisorType}`);
+            doc.text(`Month: ${salary.monthName} ${salary.year}`);
+            doc.moveDown();
+            
+            doc.text('Salary Details:');
+            doc.text(`Basic Salary: ${salary.basicSalary.toFixed(2)}`);
+            doc.text(`Allowances: ${salary.allowances.toFixed(2)}`);
+            doc.text(`Deductions: ${salary.deductions.toFixed(2)}`);
+            doc.text(`Advance: ${salary.advanceSalary.toFixed(2)}`);
+            doc.moveDown();
+            
+            doc.fontSize(14).text(`Net Salary: ${salary.netMonthlySalary.toFixed(2)}`, { underline: true });
+            doc.text(`Paid Amount: ${salary.paidAmount.toFixed(2)}`);
+            doc.text(`Balance: ${salary.balanceAmount.toFixed(2)}`);
+            doc.moveDown();
+            
+            doc.text(`Status: ${salary.status}`);
+            doc.text(`Generated on: ${formatDate(new Date())}`);
+            
+            // Finalize PDF
+            doc.end();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid format parameter. Use json or pdf"
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+
+// Generate Daily Salary Report
 export const generateDailyReport = async (req, res) => {
-  try {
-    const { date, format = 'json' } = req.query;
-    
-    if (!date) {
-      return res.status(400).json({
-        success: false,
-        message: "Date parameter is required (DD/MM/YYYY format)"
-      });
-    }
+    try {
+        const { DD, MM, YYYY } = req.params;
+        const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
+        const date = `${DD}/${MM}/${YYYY}`;
 
-    const salaries = await SupervisorSalary.find({ date })
-      .populate('supervisorId', 'name email phone supervisorType')
-      .sort({ 'supervisorId.name': 1 });
+        // Validate date format
+        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid date format. Please use DD/MM/YYYY"
+            });
+        }
 
-    if (salaries.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No salary records found for the specified date"
-      });
-    }
+        const salaries = await SupervisorSalary.find({ date })
+            .populate('supervisorId', 'name supervisorType')
+            .sort({ 'supervisorId.name': 1 });
 
-    const reportData = salaries.map(salary => ({
-      supervisor: salary.supervisorId,
-      date: salary.date,
-      basicSalary: salary.basicSalary,
-      allowances: salary.allowances,
-      deductions: salary.deductions,
-      netSalary: salary.netMonthlySalary,
-      paidAmount: salary.paidAmount,
-      balanceAmount: salary.balanceAmount,
-      status: salary.status
-    }));
-
-    if (format === 'pdf') {
-      const doc = new PDFDocument();
-      const buffers = [];
-      
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=daily_report_${date.replace(/\//g, '-')}.pdf`);
-        res.send(pdfData);
-      });
-
-      doc.fontSize(18).text('Daily Salary Report', { align: 'center' });
-      doc.fontSize(12).text(`Date: ${date}`, { align: 'center' });
-      doc.moveDown();
-
-      // Table headers
-      doc.font('Helvetica-Bold');
-      doc.text('Name', 50, 150);
-      doc.text('Basic', 200, 150);
-      doc.text('Allowances', 250, 150);
-      doc.text('Deductions', 320, 150);
-      doc.text('Net Salary', 400, 150);
-      doc.text('Status', 500, 150);
-      doc.font('Helvetica');
-
-      // Table rows
-      let y = 170;
-      reportData.forEach(record => {
-        doc.text(record.supervisor.name, 50, y);
-        doc.text(`₹${record.basicSalary.toFixed(2)}`, 200, y);
-        doc.text(`₹${record.allowances.toFixed(2)}`, 250, y);
-        doc.text(`₹${record.deductions.toFixed(2)}`, 320, y);
-        doc.text(`₹${record.netSalary.toFixed(2)}`, 400, y);
-        doc.text(record.status, 500, y);
-        y += 20;
-      });
-
-      doc.end();
-    } else if (format === 'excel') {
-      const workbook = new exceljs.Workbook();
-      const worksheet = workbook.addWorksheet('Daily Report');
-
-      worksheet.columns = [
-        { header: 'Name', key: 'name', width: 25 },
-        { header: 'Basic Salary', key: 'basic', width: 15 },
-        { header: 'Allowances', key: 'allowances', width: 15 },
-        { header: 'Deductions', key: 'deductions', width: 15 },
-        { header: 'Net Salary', key: 'net', width: 15 },
-        { header: 'Status', key: 'status', width: 15 }
-      ];
-
-      reportData.forEach(record => {
-        worksheet.addRow({
-          name: record.supervisor.name,
-          basic: record.basicSalary,
-          allowances: record.allowances,
-          deductions: record.deductions,
-          net: record.netSalary,
-          status: record.status
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                date,
+                count: salaries.length,
+                data: salaries
+            });
+        } else if (format === 'excel') {
+            // Create Excel workbook
+            const workbook = new exceljs.Workbook();
+            const worksheet = workbook.addWorksheet('Daily Salary Report');
+            
+            // Add headers
+            worksheet.columns = [
+                { header: 'ID', key: '_id', width: 10 },
+                { header: 'Supervisor', key: 'name', width: 25 },
+                { header: 'Type', key: 'type', width: 20 },
+                { header: 'Basic Salary', key: 'basic', width: 15 },
+                { header: 'Net Salary', key: 'net', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+            
+            // Add data
+            salaries.forEach(salary => {
+                worksheet.addRow({
+                    _id: salary._id,
+                    name: salary.supervisorId.name,
+                    type: salary.supervisorId.supervisorType,
+                    basic: salary.basicSalary,
+                    net: salary.netMonthlySalary,
+                    status: salary.status
+                });
+            });
+            
+            // Set response headers
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename=daily_salary_report_${DD}_${MM}_${YYYY}.xlsx`
+            );
+            
+            // Send the workbook
+            return workbook.xlsx.write(res).then(() => {
+                res.end();
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument();
+            const filename = `daily_salary_report_${DD}_${MM}_${YYYY}.pdf`;
+            
+            // Set response headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            
+            // Pipe PDF to response
+            doc.pipe(res);
+            
+            // Add content
+            doc.fontSize(18).text(`Daily Salary Report - ${date}`, { align: 'center' });
+            doc.moveDown();
+            
+            doc.fontSize(12);
+            doc.text(`Total Records: ${salaries.length}`);
+            doc.moveDown();
+            
+            salaries.forEach((salary, index) => {
+                doc.text(`${index + 1}. ${salary.supervisorId.name} (${salary.supervisorId.supervisorType})`);
+                doc.text(`   Basic: ${salary.basicSalary.toFixed(2)} | Net: ${salary.netMonthlySalary.toFixed(2)} | Status: ${salary.status}`);
+                doc.moveDown(0.5);
+            });
+            
+            // Finalize PDF
+            doc.end();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid format parameter. Use json, excel, or pdf"
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=daily_report_${date.replace(/\//g, '-')}.xlsx`);
-      await workbook.xlsx.write(res);
-      return res.end();
-    } else {
-      res.status(200).json({
-        success: true,
-        date,
-        count: reportData.length,
-        data: reportData
-      });
     }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
-// 8. Generate Weekly Report
-export const generateWeeklyReport = async (req, res) => {
-  try {
-    const { week, month, year, format = 'json' } = req.query;
-    
-    if (!week || !month || !year) {
-      return res.status(400).json({
-        success: false,
-        message: "Week, month, and year parameters are required"
-      });
-    }
 
-    const salaries = await SupervisorSalary.find({ 
-      week: parseInt(week), 
-      month: parseInt(month), 
-      year: parseInt(year) 
-    })
-      .populate('supervisorId', 'name email phone supervisorType')
-      .sort({ 'supervisorId.name': 1 });
 
-    if (salaries.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No salary records found for the specified week"
-      });
-    }
 
-    const monthName = getMonthName(parseInt(month));
-    const period = `Week ${week}, ${monthName} ${year}`;
-    
-    const reportData = salaries.map(salary => ({
-      supervisor: salary.supervisorId,
-      date: salary.date,
-      basicSalary: salary.basicSalary,
-      allowances: salary.allowances,
-      deductions: salary.deductions,
-      netSalary: salary.netMonthlySalary,
-      paidAmount: salary.paidAmount,
-      balanceAmount: salary.balanceAmount,
-      status: salary.status
-    }));
-
-    if (format === 'pdf') {
-      const doc = new PDFDocument();
-      const buffers = [];
-      
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=weekly_report_week${week}_${month}_${year}.pdf`);
-        res.send(pdfData);
-      });
-
-      doc.fontSize(18).text('Weekly Salary Report', { align: 'center' });
-      doc.fontSize(12).text(`Period: ${period}`, { align: 'center' });
-      doc.moveDown();
-
-      // Table headers
-      doc.font('Helvetica-Bold');
-      doc.text('Name', 50, 150);
-      doc.text('Date', 150, 150);
-      doc.text('Basic', 250, 150);
-      doc.text('Net Salary', 350, 150);
-      doc.text('Paid', 450, 150);
-      doc.text('Status', 550, 150);
-      doc.font('Helvetica');
-
-      // Table rows
-      let y = 170;
-      reportData.forEach(record => {
-        doc.text(record.supervisor.name, 50, y);
-        doc.text(record.date, 150, y);
-        doc.text(`₹${record.basicSalary.toFixed(2)}`, 250, y);
-        doc.text(`₹${record.netSalary.toFixed(2)}`, 350, y);
-        doc.text(`₹${record.paidAmount.toFixed(2)}`, 450, y);
-        doc.text(record.status, 550, y);
-        y += 20;
-      });
-
-      doc.end();
-    } else if (format === 'excel') {
-      const workbook = new exceljs.Workbook();
-      const worksheet = workbook.addWorksheet('Weekly Report');
-
-      worksheet.columns = [
-        { header: 'Name', key: 'name', width: 25 },
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Basic Salary', key: 'basic', width: 15 },
-        { header: 'Net Salary', key: 'net', width: 15 },
-        { header: 'Paid Amount', key: 'paid', width: 15 },
-        { header: 'Status', key: 'status', width: 15 }
-      ];
-
-      reportData.forEach(record => {
-        worksheet.addRow({
-          name: record.supervisor.name,
-          date: record.date,
-          basic: record.basicSalary,
-          net: record.netSalary,
-          paid: record.paidAmount,
-          status: record.status
-        });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=weekly_report_week${week}_${month}_${year}.xlsx`);
-      await workbook.xlsx.write(res);
-      return res.end();
-    } else {
-      res.status(200).json({
-        success: true,
-        period,
-        count: reportData.length,
-        data: reportData
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-// 9. Generate Monthly Report
+// Generate Monthly Salary Report
 export const generateMonthlyReport = async (req, res) => {
-  try {
-    const { month, year, format = 'json' } = req.query;
-    
-    if (!month || !year) {
-      return res.status(400).json({
-        success: false,
-        message: "Month and year parameters are required"
-      });
-    }
+    try {
+        const { MM, YYYY } = req.params;
+        const format = req.query.format || 'json';
+        const monthName = getMonthName(parseInt(MM));
 
-    const salaries = await SupervisorSalary.find({ 
-      month: parseInt(month), 
-      year: parseInt(year) 
-    })
-      .populate('supervisorId', 'name email phone supervisorType')
-      .sort({ 'supervisorId.name': 1 });
+        const salaries = await SupervisorSalary.find({
+            month: parseInt(MM),
+            year: parseInt(YYYY)
+        }).populate('supervisorId', 'name supervisorType');
 
-    if (salaries.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No salary records found for the specified month"
-      });
-    }
-
-    const monthName = getMonthName(parseInt(month));
-    const period = `${monthName} ${year}`;
-    
-    const reportData = salaries.map(salary => ({
-      supervisor: salary.supervisorId,
-      basicSalary: salary.basicSalary,
-      allowances: salary.allowances,
-      deductions: salary.deductions,
-      netSalary: salary.netMonthlySalary,
-      paidAmount: salary.paidAmount,
-      balanceAmount: salary.balanceAmount,
-      status: salary.status,
-      workingDays: salary.workingDays,
-      totalDays: salary.totalDays
-    }));
-
-    if (format === 'pdf') {
-      const doc = new PDFDocument();
-      const buffers = [];
-      
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=monthly_report_${month}_${year}.pdf`);
-        res.send(pdfData);
-      });
-
-      doc.fontSize(18).text('Monthly Salary Report', { align: 'center' });
-      doc.fontSize(12).text(`Period: ${period}`, { align: 'center' });
-      doc.moveDown();
-
-      // Table headers
-      doc.font('Helvetica-Bold');
-      doc.text('Name', 50, 150);
-      doc.text('Working Days', 150, 150);
-      doc.text('Basic', 250, 150);
-      doc.text('Allowances', 350, 150);
-      doc.text('Net Salary', 450, 150);
-      doc.text('Status', 550, 150);
-      doc.font('Helvetica');
-
-      // Table rows
-      let y = 170;
-      reportData.forEach(record => {
-        doc.text(record.supervisor.name, 50, y);
-        doc.text(`${record.workingDays}/${record.totalDays}`, 150, y);
-        doc.text(`₹${record.basicSalary.toFixed(2)}`, 250, y);
-        doc.text(`₹${record.allowances.toFixed(2)}`, 350, y);
-        doc.text(`₹${record.netSalary.toFixed(2)}`, 450, y);
-        doc.text(record.status, 550, y);
-        y += 20;
-      });
-
-      doc.end();
-    } else if (format === 'excel') {
-      const workbook = new exceljs.Workbook();
-      const worksheet = workbook.addWorksheet('Monthly Report');
-
-      worksheet.columns = [
-        { header: 'Name', key: 'name', width: 25 },
-        { header: 'Working Days', key: 'days', width: 15 },
-        { header: 'Basic Salary', key: 'basic', width: 15 },
-        { header: 'Allowances', key: 'allowances', width: 15 },
-        { header: 'Net Salary', key: 'net', width: 15 },
-        { header: 'Status', key: 'status', width: 15 }
-      ];
-
-      reportData.forEach(record => {
-        worksheet.addRow({
-          name: record.supervisor.name,
-          days: `${record.workingDays}/${record.totalDays}`,
-          basic: record.basicSalary,
-          allowances: record.allowances,
-          net: record.netSalary,
-          status: record.status
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                period: `${monthName} ${YYYY}`,
+                count: salaries.length,
+                data: salaries
+            });
+        } else if (format === 'excel') {
+            // Create Excel workbook
+            const workbook = new exceljs.Workbook();
+            const worksheet = workbook.addWorksheet('Monthly Salary Report');
+            
+            // Add headers
+            worksheet.columns = [
+                { header: 'ID', key: '_id', width: 10 },
+                { header: 'Supervisor', key: 'name', width: 25 },
+                { header: 'Type', key: 'type', width: 20 },
+                { header: 'Basic', key: 'basic', width: 15 },
+                { header: 'Allowances', key: 'allowances', width: 15 },
+                { header: 'Deductions', key: 'deductions', width: 15 },
+                { header: 'Advance', key: 'advance', width: 15 },
+                { header: 'Net Salary', key: 'net', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+            
+            // Add data
+            salaries.forEach(salary => {
+                worksheet.addRow({
+                    _id: salary._id,
+                    name: salary.supervisorId.name,
+                    type: salary.supervisorId.supervisorType,
+                    basic: salary.basicSalary,
+                    allowances: salary.allowances,
+                    deductions: salary.deductions,
+                    advance: salary.advanceSalary,
+                    net: salary.netMonthlySalary,
+                    status: salary.status
+                });
+            });
+            
+            // Add totals row
+            const totalNet = salaries.reduce((sum, salary) => sum + salary.netMonthlySalary, 0);
+            worksheet.addRow({
+                _id: 'TOTAL',
+                name: '',
+                type: '',
+                basic: '',
+                allowances: '',
+                deductions: '',
+                advance: '',
+                net: totalNet,
+                status: ''
+            });
+            
+            // Set response headers
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename=monthly_salary_report_${MM}_${YYYY}.xlsx`
+            );
+            
+            // Send the workbook
+            return workbook.xlsx.write(res).then(() => {
+                res.end();
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument();
+            const filename = `monthly_salary_report_${MM}_${YYYY}.pdf`;
+            
+            // Set response headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            
+            // Pipe PDF to response
+            doc.pipe(res);
+            
+            // Add content
+            doc.fontSize(18).text(
+                `Monthly Salary Report - ${monthName} ${YYYY}`,
+                { align: 'center' }
+            );
+            doc.moveDown();
+            
+            doc.fontSize(12);
+            doc.text(`Total Records: ${salaries.length}`);
+            doc.moveDown();
+            
+            let totalNet = 0;
+            salaries.forEach((salary, index) => {
+                doc.text(`${index + 1}. ${salary.supervisorId.name} (${salary.supervisorId.supervisorType})`);
+                doc.text(`   Basic: ${salary.basicSalary.toFixed(2)} | Allowances: ${salary.allowances.toFixed(2)}`);
+                doc.text(`   Deductions: ${salary.deductions.toFixed(2)} | Advance: ${salary.advanceSalary.toFixed(2)}`);
+                doc.text(`   Net Salary: ${salary.netMonthlySalary.toFixed(2)} | Status: ${salary.status}`);
+                doc.moveDown(0.5);
+                totalNet += salary.netMonthlySalary;
+            });
+            
+            doc.moveDown();
+            doc.fontSize(14).text(`Total Net Salaries: ${totalNet.toFixed(2)}`, { underline: true });
+            
+            // Finalize PDF
+            doc.end();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid format parameter. Use json, excel, or pdf"
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=monthly_report_${month}_${year}.xlsx`);
-      await workbook.xlsx.write(res);
-      return res.end();
-    } else {
-      res.status(200).json({
-        success: true,
-        period,
-        count: reportData.length,
-        data: reportData
-      });
     }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
-// 10. Generate Yearly Report
+
+
+// Generate Yearly Salary Report
 export const generateYearlyReport = async (req, res) => {
-  try {
-    const { year, format = 'json' } = req.query;
-    
-    if (!year) {
-      return res.status(400).json({
-        success: false,
-        message: "Year parameter is required"
-      });
-    }
+    try {
+        const { YYYY } = req.params;
+        const format = req.query.format || 'json';
 
-    const salaries = await SupervisorSalary.find({ year: parseInt(year) })
-      .populate('supervisorId', 'name email phone supervisorType')
-      .sort({ month: 1, 'supervisorId.name': 1 });
+        const salaries = await SupervisorSalary.find({
+            year: parseInt(YYYY)
+        }).populate('supervisorId', 'name supervisorType');
 
-    if (salaries.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No salary records found for the specified year"
-      });
-    }
-
-    const period = `Year ${year}`;
-    
-    // Group by supervisor
-    const supervisors = {};
-    salaries.forEach(salary => {
-      if (!supervisors[salary.supervisorId._id]) {
-        supervisors[salary.supervisorId._id] = {
-          supervisor: salary.supervisorId,
-          months: {},
-          totalBasic: 0,
-          totalNet: 0,
-          totalPaid: 0
-        };
-      }
-      
-      const supervisor = supervisors[salary.supervisorId._id];
-      supervisor.months[salary.month] = {
-        monthName: salary.monthName,
-        basicSalary: salary.basicSalary,
-        netSalary: salary.netMonthlySalary,
-        paidAmount: salary.paidAmount,
-        status: salary.status
-      };
-      
-      supervisor.totalBasic += salary.basicSalary;
-      supervisor.totalNet += salary.netMonthlySalary;
-      supervisor.totalPaid += salary.paidAmount;
-    });
-
-    if (format === 'pdf') {
-      const doc = new PDFDocument();
-      const buffers = [];
-      
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        const pdfData = Buffer.concat(buffers);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=yearly_report_${year}.pdf`);
-        res.send(pdfData);
-      });
-
-      doc.fontSize(18).text('Yearly Salary Report', { align: 'center' });
-      doc.fontSize(12).text(`Year: ${year}`, { align: 'center' });
-      doc.moveDown();
-
-      // For each supervisor
-      Object.values(supervisors).forEach(supervisor => {
-        doc.fontSize(14).text(supervisor.supervisor.name, { underline: true });
-        doc.moveDown(0.5);
-        
-        // Table headers
-        doc.font('Helvetica-Bold');
-        doc.text('Month', 50);
-        doc.text('Basic', 150);
-        doc.text('Net Salary', 250);
-        doc.text('Paid', 350);
-        doc.text('Status', 450);
-        doc.font('Helvetica');
-
-        let y = doc.y + 20;
-        
-        // Monthly data
-        Object.entries(supervisor.months).forEach(([month, data]) => {
-          doc.text(data.monthName, 50, y);
-          doc.text(`₹${data.basicSalary.toFixed(2)}`, 150, y);
-          doc.text(`₹${data.netSalary.toFixed(2)}`, 250, y);
-          doc.text(`₹${data.paidAmount.toFixed(2)}`, 350, y);
-          doc.text(data.status, 450, y);
-          y += 20;
+        if (format === 'json') {
+            return res.status(200).json({
+                success: true,
+                year: YYYY,
+                count: salaries.length,
+                data: salaries
+            });
+        } else if (format === 'excel') {
+            // Create Excel workbook
+            const workbook = new exceljs.Workbook();
+            const worksheet = workbook.addWorksheet('Yearly Salary Report');
+            
+            // Add headers
+            worksheet.columns = [
+                { header: 'ID', key: '_id', width: 10 },
+                { header: 'Supervisor', key: 'name', width: 25 },
+                { header: 'Type', key: 'type', width: 20 },
+                { header: 'Month', key: 'month', width: 15 },
+                { header: 'Basic', key: 'basic', width: 15 },
+                { header: 'Net Salary', key: 'net', width: 15 },
+                { header: 'Status', key: 'status', width: 15 }
+            ];
+            
+            // Add data
+            salaries.forEach(salary => {
+                worksheet.addRow({
+                    _id: salary._id,
+                    name: salary.supervisorId.name,
+                    type: salary.supervisorId.supervisorType,
+                    month: salary.monthName,
+                    basic: salary.basicSalary,
+                    net: salary.netMonthlySalary,
+                    status: salary.status
+                });
+            });
+            
+            // Set response headers
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename=yearly_salary_report_${YYYY}.xlsx`
+            );
+            
+            // Send the workbook
+            return workbook.xlsx.write(res).then(() => {
+                res.end();
+            });
+        } else if (format === 'pdf') {
+            // Create PDF document
+            const doc = new PDFDocument();
+            const filename = `yearly_salary_report_${YYYY}.pdf`;
+            
+            // Set response headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            
+            // Pipe PDF to response
+            doc.pipe(res);
+            
+            // Add content
+            doc.fontSize(18).text(
+                `Yearly Salary Report - ${YYYY}`,
+                { align: 'center' }
+            );
+            doc.moveDown();
+            
+            doc.fontSize(12);
+            doc.text(`Total Records: ${salaries.length}`);
+            doc.moveDown();
+            
+            // Group by supervisor
+            const bySupervisor = {};
+            salaries.forEach(salary => {
+                if (!bySupervisor[salary.supervisorId.name]) {
+                    bySupervisor[salary.supervisorId.name] = {
+                        type: salary.supervisorId.supervisorType,
+                        salaries: []
+                    };
+                }
+                bySupervisor[salary.supervisorId.name].salaries.push(salary);
+            });
+            
+            // Add supervisor-wise summary
+            Object.keys(bySupervisor).forEach((name, idx) => {
+                const supervisor = bySupervisor[name];
+                const total = supervisor.salaries.reduce((sum, s) => sum + s.netMonthlySalary, 0);
+                
+                doc.text(`${idx + 1}. ${name} (${supervisor.type})`);
+                doc.text(`   Months Worked: ${supervisor.salaries.length}`);
+                doc.text(`   Total Earnings: ${total.toFixed(2)}`);
+                doc.moveDown(0.5);
+            });
+            
+            // Add grand total
+            const grandTotal = salaries.reduce((sum, salary) => sum + salary.netMonthlySalary, 0);
+            doc.moveDown();
+            doc.fontSize(14).text(`Grand Total: ${grandTotal.toFixed(2)}`, { underline: true });
+            
+            // Finalize PDF
+            doc.end();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid format parameter. Use json, excel, or pdf"
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
         });
-
-        // Totals
-        doc.font('Helvetica-Bold');
-        doc.text('TOTAL:', 50, y);
-        doc.text(`₹${supervisor.totalBasic.toFixed(2)}`, 150, y);
-        doc.text(`₹${supervisor.totalNet.toFixed(2)}`, 250, y);
-        doc.text(`₹${supervisor.totalPaid.toFixed(2)}`, 350, y);
-        doc.font('Helvetica');
-        
-        doc.moveDown(2);
-      });
-
-      doc.end();
-    } else if (format === 'excel') {
-      const workbook = new exceljs.Workbook();
-      
-      // Create a worksheet for each supervisor
-      Object.values(supervisors).forEach(supervisor => {
-        const worksheet = workbook.addWorksheet(supervisor.supervisor.name.substring(0, 31)); // Sheet name limit
-        
-        worksheet.columns = [
-          { header: 'Month', key: 'month', width: 15 },
-          { header: 'Basic Salary', key: 'basic', width: 15 },
-          { header: 'Net Salary', key: 'net', width: 15 },
-          { header: 'Paid Amount', key: 'paid', width: 15 },
-          { header: 'Status', key: 'status', width: 15 }
-        ];
-
-        Object.entries(supervisor.months).forEach(([month, data]) => {
-          worksheet.addRow({
-            month: data.monthName,
-            basic: data.basicSalary,
-            net: data.netSalary,
-            paid: data.paidAmount,
-            status: data.status
-          });
-        });
-
-        // Add totals row
-        worksheet.addRow([]);
-        worksheet.addRow({
-          month: 'TOTAL',
-          basic: supervisor.totalBasic,
-          net: supervisor.totalNet,
-          paid: supervisor.totalPaid
-        });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=yearly_report_${year}.xlsx`);
-      await workbook.xlsx.write(res);
-      return res.end();
-    } else {
-      res.status(200).json({
-        success: true,
-        period,
-        count: Object.keys(supervisors).length,
-        data: Object.values(supervisors).map(supervisor => ({
-          supervisor: supervisor.supervisor,
-          months: supervisor.months,
-          totals: {
-            basicSalary: supervisor.totalBasic,
-            netSalary: supervisor.totalNet,
-            paidAmount: supervisor.totalPaid
-          }
-        }))
-      });
     }
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
 
 
 
 
+// Helper function to get week range in a month
+const getWeekRangeInMonth = (year, month, weekNumber) => {
+    const firstDay = new Date(year, month - 1, 1);
+    const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    
+    // Calculate start date (Monday of the requested week)
+    let startDate = new Date(firstDay);
+    startDate.setDate(1 + (weekNumber - 1) * 7 - firstDayOfWeek + (firstDayOfWeek === 0 ? -6 : 1));
+    
+    // Calculate end date (Sunday of the week)
+    let endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    // Adjust if dates fall outside the current month
+    if (startDate.getMonth() !== month - 1) {
+        startDate = new Date(year, month - 1, 1);
+    }
+    if (endDate.getMonth() !== month - 1) {
+        endDate = new Date(year, month, 0);
+    }
+    
+    // Format dates
+    const format = (date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+    
+    return {
+        start: format(startDate),
+        end: format(endDate)
+    };
+};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import mongoose from 'mongoose';
-// import SupervisorSalary from '../models/SupervisorSalary.js';
-// import Supervisor from '../models/Supervisor.js';
-// import getNextSalaryId from '../utils/sequenceGenerator.js'; // Correct import path
-// import exceljs from 'exceljs';
-// import PDFDocument from 'pdfkit';
-
-// // Helper functions
-// const formatDate = (dateString) => {
-//   if (!dateString) return null;
-//   const date = new Date(dateString);
-//   const day = String(date.getDate()).padStart(2, '0');
-//   const month = String(date.getMonth() + 1).padStart(2, '0');
-//   const year = date.getFullYear();
-//   return `${day}/${month}/${year}`;
+// Helper function to format date as DD/MM/YYYY
+// const formatDate = (date) => {
+//     if (!date) return null;
+//     const d = new Date(date);
+//     const day = d.getDate().toString().padStart(2, '0');
+//     const month = (d.getMonth() + 1).toString().padStart(2, '0');
+//     const year = d.getFullYear();
+//     return `${day}/${month}/${year}`;
 // };
 
+// Helper function to get month name
 // const getMonthName = (month) => {
-//   const months = [
-//     'January', 'February', 'March', 'April', 'May', 'June',
-//     'July', 'August', 'September', 'October', 'November', 'December'
-//   ];
-//   return months[month - 1];
+//     const months = [
+//         'January', 'February', 'March', 'April', 'May', 'June',
+//         'July', 'August', 'September', 'October', 'November', 'December'
+//     ];
+//     return months[month - 1] || '';
 // };
 
-// const getWeekNumber = (date) => {
-//   const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-//   const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-//   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-// };
 
-// // // Auto-increment ID generator
-// const getNextSequence = async (name) => {
-//   const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
-//     { _id: name },
-//     { $inc: { seq: 1 } },
-//     { returnOriginal: false, upsert: true }
-//   );
-//   return result.value.seq;
-// };
 
-// // 1. Create Monthly Salary
-// export const createMonthlySalary = async (req, res) => {
+
+
+
+
+
+
+// // 7. Generate Daily Report
+// export const generateDailyReport = async (req, res) => {
 //   try {
-//     const { name, date, actualMonthlySalary, allowances = 0, deductions = 0, advanceSalary = 0, paidAmount = 0 } = req.body;
-
-//     // Validate inputs
-//     if (!name) {
+//     const { date, format = 'json' } = req.query;
+    
+//     if (!date) {
 //       return res.status(400).json({
 //         success: false,
-//         message: "Name is required"
+//         message: "Date parameter is required (DD/MM/YYYY format)"
 //       });
 //     }
 
-//     // Parse the date to get month and year
-//     const [day, month, year] = date.split('/').map(Number);
-//     const monthName = getMonthName(month);
-
-//     // Find supervisor by name
-//     const supervisor = await Supervisor.findOne({ name });
-//     if (!supervisor) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Supervisor not found"
-//       });
-//     }
-
-//     // Calculate working days and basic salary from attendance
-//     const attendanceDays = supervisor.attendanceRecords.filter(record => {
-//       const [recordDay, recordMonth, recordYear] = record.date.split('/').map(Number);
-//       return recordMonth === month && recordYear === year;
-//     });
-
-//     const workingDays = attendanceDays.length;
-//     const totalDays = new Date(year, month, 0).getDate();
-
-//     // Calculate basic salary based on attendance
-//     const basicSalary = attendanceDays.reduce((total, day) => {
-//       const rates = {
-//         Fullday: 1000,
-//         Halfday: 500,
-//         Overtime: 1500,
-//         null: 0
-//       };
-//       return total + (rates[day.status] || 0);
-//     }, 0);
-
-//     // Calculate net monthly salary (use max of actual or attendance-based)
-//     const netMonthlySalary = Math.max(
-//       Number(actualMonthlySalary), 
-//       basicSalary
-//     ) + Number(allowances) - Number(deductions);
-
-//     // Calculate balance
-//     const balanceAmount = netMonthlySalary - Number(paidAmount) - Number(advanceSalary);
-
-//     // Determine status
-//     let status;
-//     if (paidAmount <= 0) {
-//       status = "Pending";
-//     } else if (balanceAmount <= 0) {
-//       status = "Paid";
-//     } else {
-//       status = "Partial";
-//     }
-
-//     // Generate auto-incremented ID
-//     const _id = await getNextSequence('supervisorSalaryId');
-
-//     // Create new salary record
-//     const salaryRecord = new SupervisorSalary({
-//       _id,
-//       supervisorId: supervisor._id,
-//       month,
-//       monthName,
-//       year,
-//       date: formatDate(new Date(year, month - 1, day)),
-//       actualMonthlySalary: Number(actualMonthlySalary),
-//       basicSalary,
-//       allowances: Number(allowances),
-//       deductions: Number(deductions),
-//       advanceSalary: Number(advanceSalary),
-//       netMonthlySalary,
-//       paidAmount: Number(paidAmount),
-//       balanceAmount,
-//       status,
-//       workingDays,
-//       totalDays,
-//       attendanceRecords: attendanceDays
-//     });
-
-//     await salaryRecord.save();
-
-//     res.status(201).json({
-//       success: true,
-//       data: {
-//         ...salaryRecord.toObject(),
-//         supervisorId: {
-//           _id: supervisor._id,
-//           name: supervisor.name,
-//           email: supervisor.email,
-//           phone: supervisor.phone,
-//           supervisorType: supervisor.supervisorType
-//         }
-//       }
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // 2. Get All Salary Records
-// export const getAllSalaries = async (req, res) => {
-//   try {
-//     const salaries = await SupervisorSalary.find({})
+//     const salaries = await SupervisorSalary.find({ date })
 //       .populate('supervisorId', 'name email phone supervisorType')
-//       .sort({ _id: 1 });
+//       .sort({ 'supervisorId.name': 1 });
 
-//     res.status(200).json({
-//       success: true,
-//       count: salaries.length,
-//       data: salaries.map(salary => ({
-//         ...salary.toObject(),
-//         supervisorId: {
-//           _id: salary.supervisorId._id,
-//           name: salary.supervisorId.name,
-//           email: salary.supervisorId.email,
-//           phone: salary.supervisorId.phone,
-//           supervisorType: salary.supervisorId.supervisorType
-//         }
-//       }))
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // 3. Get Salary by ID with PDF Receipt
-// export const getSalaryById = async (req, res) => {
-//   try {
-//     const salary = await SupervisorSalary.findById(req.params.id)
-//       .populate('supervisorId', 'name email phone supervisorType');
-
-//     if (!salary) {
+//     if (salaries.length === 0) {
 //       return res.status(404).json({
 //         success: false,
-//         message: "Salary record not found"
+//         message: "No salary records found for the specified date"
 //       });
 //     }
 
-//     // Return JSON response if not requesting PDF
-//     if (req.query.format !== 'pdf') {
-//       return res.status(200).json({
-//         success: true,
-//         data: {
-//           ...salary.toObject(),
-//           supervisorId: {
-//             _id: salary.supervisorId._id,
-//             name: salary.supervisorId.name,
-//             email: salary.supervisorId.email,
-//             phone: salary.supervisorId.phone,
-//             supervisorType: salary.supervisorId.supervisorType
-//           }
-//         }
+//     const reportData = salaries.map(salary => ({
+//       supervisor: salary.supervisorId,
+//       date: salary.date,
+//       basicSalary: salary.basicSalary,
+//       allowances: salary.allowances,
+//       deductions: salary.deductions,
+//       netSalary: salary.netMonthlySalary,
+//       paidAmount: salary.paidAmount,
+//       balanceAmount: salary.balanceAmount,
+//       status: salary.status
+//     }));
+
+//     if (format === 'pdf') {
+//       const doc = new PDFDocument();
+//       const buffers = [];
+      
+//       doc.on('data', buffers.push.bind(buffers));
+//       doc.on('end', () => {
+//         const pdfData = Buffer.concat(buffers);
+//         res.setHeader('Content-Type', 'application/pdf');
+//         res.setHeader('Content-Disposition', `attachment; filename=daily_report_${date.replace(/\//g, '-')}.pdf`);
+//         res.send(pdfData);
 //       });
-//     }
 
-//     // Generate PDF receipt
-//     const doc = new PDFDocument();
-//     const buffers = [];
-    
-//     doc.on('data', buffers.push.bind(buffers));
-//     doc.on('end', () => {
-//       const pdfData = Buffer.concat(buffers);
-//       res.setHeader('Content-Type', 'application/pdf');
-//       res.setHeader('Content-Disposition', `attachment; filename=salary_receipt_${salary._id}.pdf`);
-//       res.send(pdfData);
-//     });
+//       doc.fontSize(18).text('Daily Salary Report', { align: 'center' });
+//       doc.fontSize(12).text(`Date: ${date}`, { align: 'center' });
+//       doc.moveDown();
 
-//     // PDF Content
-//     doc.fontSize(18).text('Salary Receipt', { align: 'center' });
-//     doc.moveDown();
-//     doc.fontSize(12).text(`Receipt ID: ${salary._id}`, { align: 'left' });
-//     doc.text(`Date: ${salary.date}`, { align: 'left' });
-//     doc.moveDown();
+//       // Table headers
+//       doc.font('Helvetica-Bold');
+//       doc.text('Name', 50, 150);
+//       doc.text('Basic', 200, 150);
+//       doc.text('Allowances', 250, 150);
+//       doc.text('Deductions', 320, 150);
+//       doc.text('Net Salary', 400, 150);
+//       doc.text('Status', 500, 150);
+//       doc.font('Helvetica');
 
-//     // Supervisor Info
-//     doc.fontSize(14).text('Supervisor Information', { underline: true });
-//     doc.fontSize(12).text(`Name: ${salary.supervisorId.name}`);
-//     doc.text(`ID: ${salary.supervisorId._id}`);
-//     doc.text(`Type: ${salary.supervisorId.supervisorType}`);
-//     doc.moveDown();
-
-//     // Salary Details
-//     doc.fontSize(14).text('Salary Details', { underline: true });
-//     doc.fontSize(12).text(`Month: ${salary.monthName} ${salary.year}`);
-//     doc.text(`Working Days: ${salary.workingDays}/${salary.totalDays}`);
-//     doc.text(`Basic Salary: ₹${salary.basicSalary.toFixed(2)}`);
-//     doc.text(`Allowances: ₹${salary.allowances.toFixed(2)}`);
-//     doc.text(`Deductions: ₹${salary.deductions.toFixed(2)}`);
-//     doc.text(`Advance: ₹${salary.advanceSalary.toFixed(2)}`);
-//     doc.moveDown();
-
-//     // Payment Info
-//     doc.fontSize(14).text('Payment Information', { underline: true });
-//     doc.fontSize(12).text(`Net Salary: ₹${salary.netMonthlySalary.toFixed(2)}`);
-//     doc.text(`Paid Amount: ₹${salary.paidAmount.toFixed(2)}`);
-//     doc.text(`Balance: ₹${salary.balanceAmount.toFixed(2)}`);
-//     doc.text(`Status: ${salary.status}`);
-//     doc.moveDown();
-
-//     doc.fontSize(10).text('This is a computer generated receipt.', { align: 'center' });
-//     doc.end();
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // 4. Update Salary Record (PUT)
-// export const updateSalary = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { name, date, actualMonthlySalary, allowances, deductions, advanceSalary, paidAmount, status } = req.body;
-
-//     const salary = await SupervisorSalary.findById(id);
-//     if (!salary) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Salary record not found"
+//       // Table rows
+//       let y = 170;
+//       reportData.forEach(record => {
+//         doc.text(record.supervisor.name, 50, y);
+//         doc.text(`₹${record.basicSalary.toFixed(2)}`, 200, y);
+//         doc.text(`₹${record.allowances.toFixed(2)}`, 250, y);
+//         doc.text(`₹${record.deductions.toFixed(2)}`, 320, y);
+//         doc.text(`₹${record.netSalary.toFixed(2)}`, 400, y);
+//         doc.text(record.status, 500, y);
+//         y += 20;
 //       });
-//     }
 
-//     // Update all fields if provided
-//     if (name) {
-//       const supervisor = await Supervisor.findOne({ name });
-//       if (!supervisor) {
-//         return res.status(404).json({
-//           success: false,
-//           message: "Supervisor not found"
+//       doc.end();
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+//       const worksheet = workbook.addWorksheet('Daily Report');
+
+//       worksheet.columns = [
+//         { header: 'Name', key: 'name', width: 25 },
+//         { header: 'Basic Salary', key: 'basic', width: 15 },
+//         { header: 'Allowances', key: 'allowances', width: 15 },
+//         { header: 'Deductions', key: 'deductions', width: 15 },
+//         { header: 'Net Salary', key: 'net', width: 15 },
+//         { header: 'Status', key: 'status', width: 15 }
+//       ];
+
+//       reportData.forEach(record => {
+//         worksheet.addRow({
+//           name: record.supervisor.name,
+//           basic: record.basicSalary,
+//           allowances: record.allowances,
+//           deductions: record.deductions,
+//           net: record.netSalary,
+//           status: record.status
 //         });
-//       }
-//       salary.supervisorId = supervisor._id;
+//       });
+
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=daily_report_${date.replace(/\//g, '-')}.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       res.status(200).json({
+//         success: true,
+//         date,
+//         count: reportData.length,
+//         data: reportData
+//       });
 //     }
-
-//     if (date) {
-//       const [day, month, year] = date.split('/').map(Number);
-//       salary.date = formatDate(new Date(year, month - 1, day));
-//       salary.month = month;
-//       salary.monthName = getMonthName(month);
-//       salary.year = year;
-//     }
-
-//     if (actualMonthlySalary !== undefined) salary.actualMonthlySalary = Number(actualMonthlySalary);
-//     if (allowances !== undefined) salary.allowances = Number(allowances);
-//     if (deductions !== undefined) salary.deductions = Number(deductions);
-//     if (advanceSalary !== undefined) salary.advanceSalary = Number(advanceSalary);
-//     if (paidAmount !== undefined) salary.paidAmount = Number(paidAmount);
-//     if (status) salary.status = status;
-
-//     // Recalculate values
-//     if (actualMonthlySalary !== undefined || allowances !== undefined || deductions !== undefined) {
-//       salary.netMonthlySalary = Math.max(
-//         salary.actualMonthlySalary,
-//         salary.basicSalary
-//       ) + salary.allowances - salary.deductions;
-//     }
-
-//     if (paidAmount !== undefined || advanceSalary !== undefined || salary.netMonthlySalary !== undefined) {
-//       salary.balanceAmount = salary.netMonthlySalary - salary.paidAmount - salary.advanceSalary;
-//     }
-
-//     salary.updatedAt = new Date();
-//     await salary.save();
-
-//     res.status(200).json({
-//       success: true,
-//       data: await salary.populate('supervisorId', 'name email phone supervisorType')
-//     });
 //   } catch (error) {
 //     res.status(500).json({
 //       success: false,
@@ -1616,22 +1362,123 @@ export const generateYearlyReport = async (req, res) => {
 //   }
 // };
 
-// // 5. Delete Salary by ID
-// export const deleteSalaryById = async (req, res) => {
+// // 8. Generate Weekly Report
+// export const generateWeeklyReport = async (req, res) => {
 //   try {
-//     const salary = await SupervisorSalary.findByIdAndDelete(req.params.id);
+//     const { week, month, year, format = 'json' } = req.query;
     
-//     if (!salary) {
-//       return res.status(404).json({
+//     if (!week || !month || !year) {
+//       return res.status(400).json({
 //         success: false,
-//         message: "Salary record not found"
+//         message: "Week, month, and year parameters are required"
 //       });
 //     }
 
-//     res.status(200).json({
-//       success: true,
-//       message: "Salary record deleted successfully"
-//     });
+//     const salaries = await SupervisorSalary.find({ 
+//       week: parseInt(week), 
+//       month: parseInt(month), 
+//       year: parseInt(year) 
+//     })
+//       .populate('supervisorId', 'name email phone supervisorType')
+//       .sort({ 'supervisorId.name': 1 });
+
+//     if (salaries.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No salary records found for the specified week"
+//       });
+//     }
+
+//     const monthName = getMonthName(parseInt(month));
+//     const period = `Week ${week}, ${monthName} ${year}`;
+    
+//     const reportData = salaries.map(salary => ({
+//       supervisor: salary.supervisorId,
+//       date: salary.date,
+//       basicSalary: salary.basicSalary,
+//       allowances: salary.allowances,
+//       deductions: salary.deductions,
+//       netSalary: salary.netMonthlySalary,
+//       paidAmount: salary.paidAmount,
+//       balanceAmount: salary.balanceAmount,
+//       status: salary.status
+//     }));
+
+//     if (format === 'pdf') {
+//       const doc = new PDFDocument();
+//       const buffers = [];
+      
+//       doc.on('data', buffers.push.bind(buffers));
+//       doc.on('end', () => {
+//         const pdfData = Buffer.concat(buffers);
+//         res.setHeader('Content-Type', 'application/pdf');
+//         res.setHeader('Content-Disposition', `attachment; filename=weekly_report_week${week}_${month}_${year}.pdf`);
+//         res.send(pdfData);
+//       });
+
+//       doc.fontSize(18).text('Weekly Salary Report', { align: 'center' });
+//       doc.fontSize(12).text(`Period: ${period}`, { align: 'center' });
+//       doc.moveDown();
+
+//       // Table headers
+//       doc.font('Helvetica-Bold');
+//       doc.text('Name', 50, 150);
+//       doc.text('Date', 150, 150);
+//       doc.text('Basic', 250, 150);
+//       doc.text('Net Salary', 350, 150);
+//       doc.text('Paid', 450, 150);
+//       doc.text('Status', 550, 150);
+//       doc.font('Helvetica');
+
+//       // Table rows
+//       let y = 170;
+//       reportData.forEach(record => {
+//         doc.text(record.supervisor.name, 50, y);
+//         doc.text(record.date, 150, y);
+//         doc.text(`₹${record.basicSalary.toFixed(2)}`, 250, y);
+//         doc.text(`₹${record.netSalary.toFixed(2)}`, 350, y);
+//         doc.text(`₹${record.paidAmount.toFixed(2)}`, 450, y);
+//         doc.text(record.status, 550, y);
+//         y += 20;
+//       });
+
+//       doc.end();
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+//       const worksheet = workbook.addWorksheet('Weekly Report');
+
+//       worksheet.columns = [
+//         { header: 'Name', key: 'name', width: 25 },
+//         { header: 'Date', key: 'date', width: 15 },
+//         { header: 'Basic Salary', key: 'basic', width: 15 },
+//         { header: 'Net Salary', key: 'net', width: 15 },
+//         { header: 'Paid Amount', key: 'paid', width: 15 },
+//         { header: 'Status', key: 'status', width: 15 }
+//       ];
+
+//       reportData.forEach(record => {
+//         worksheet.addRow({
+//           name: record.supervisor.name,
+//           date: record.date,
+//           basic: record.basicSalary,
+//           net: record.netSalary,
+//           paid: record.paidAmount,
+//           status: record.status
+//         });
+//       });
+
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=weekly_report_week${week}_${month}_${year}.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       res.status(200).json({
+//         success: true,
+//         period,
+//         count: reportData.length,
+//         data: reportData
+//       });
+//     }
 //   } catch (error) {
 //     res.status(500).json({
 //       success: false,
@@ -1639,6 +1486,684 @@ export const generateYearlyReport = async (req, res) => {
 //     });
 //   }
 // };
+
+// // 9. Generate Monthly Report
+// export const generateMonthlyReport = async (req, res) => {
+//   try {
+//     const { month, year, format = 'json' } = req.query;
+    
+//     if (!month || !year) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Month and year parameters are required"
+//       });
+//     }
+
+//     const salaries = await SupervisorSalary.find({ 
+//       month: parseInt(month), 
+//       year: parseInt(year) 
+//     })
+//       .populate('supervisorId', 'name email phone supervisorType')
+//       .sort({ 'supervisorId.name': 1 });
+
+//     if (salaries.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No salary records found for the specified month"
+//       });
+//     }
+
+//     const monthName = getMonthName(parseInt(month));
+//     const period = `${monthName} ${year}`;
+    
+//     const reportData = salaries.map(salary => ({
+//       supervisor: salary.supervisorId,
+//       basicSalary: salary.basicSalary,
+//       allowances: salary.allowances,
+//       deductions: salary.deductions,
+//       netSalary: salary.netMonthlySalary,
+//       paidAmount: salary.paidAmount,
+//       balanceAmount: salary.balanceAmount,
+//       status: salary.status,
+//       workingDays: salary.workingDays,
+//       totalDays: salary.totalDays
+//     }));
+
+//     if (format === 'pdf') {
+//       const doc = new PDFDocument();
+//       const buffers = [];
+      
+//       doc.on('data', buffers.push.bind(buffers));
+//       doc.on('end', () => {
+//         const pdfData = Buffer.concat(buffers);
+//         res.setHeader('Content-Type', 'application/pdf');
+//         res.setHeader('Content-Disposition', `attachment; filename=monthly_report_${month}_${year}.pdf`);
+//         res.send(pdfData);
+//       });
+
+//       doc.fontSize(18).text('Monthly Salary Report', { align: 'center' });
+//       doc.fontSize(12).text(`Period: ${period}`, { align: 'center' });
+//       doc.moveDown();
+
+//       // Table headers
+//       doc.font('Helvetica-Bold');
+//       doc.text('Name', 50, 150);
+//       doc.text('Working Days', 150, 150);
+//       doc.text('Basic', 250, 150);
+//       doc.text('Allowances', 350, 150);
+//       doc.text('Net Salary', 450, 150);
+//       doc.text('Status', 550, 150);
+//       doc.font('Helvetica');
+
+//       // Table rows
+//       let y = 170;
+//       reportData.forEach(record => {
+//         doc.text(record.supervisor.name, 50, y);
+//         doc.text(`${record.workingDays}/${record.totalDays}`, 150, y);
+//         doc.text(`₹${record.basicSalary.toFixed(2)}`, 250, y);
+//         doc.text(`₹${record.allowances.toFixed(2)}`, 350, y);
+//         doc.text(`₹${record.netSalary.toFixed(2)}`, 450, y);
+//         doc.text(record.status, 550, y);
+//         y += 20;
+//       });
+
+//       doc.end();
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+//       const worksheet = workbook.addWorksheet('Monthly Report');
+
+//       worksheet.columns = [
+//         { header: 'Name', key: 'name', width: 25 },
+//         { header: 'Working Days', key: 'days', width: 15 },
+//         { header: 'Basic Salary', key: 'basic', width: 15 },
+//         { header: 'Allowances', key: 'allowances', width: 15 },
+//         { header: 'Net Salary', key: 'net', width: 15 },
+//         { header: 'Status', key: 'status', width: 15 }
+//       ];
+
+//       reportData.forEach(record => {
+//         worksheet.addRow({
+//           name: record.supervisor.name,
+//           days: `${record.workingDays}/${record.totalDays}`,
+//           basic: record.basicSalary,
+//           allowances: record.allowances,
+//           net: record.netSalary,
+//           status: record.status
+//         });
+//       });
+
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=monthly_report_${month}_${year}.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       res.status(200).json({
+//         success: true,
+//         period,
+//         count: reportData.length,
+//         data: reportData
+//       });
+//     }
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message
+//     });
+//   }
+// };
+
+// // 10. Generate Yearly Report
+// export const generateYearlyReport = async (req, res) => {
+//   try {
+//     const { year, format = 'json' } = req.query;
+    
+//     if (!year) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Year parameter is required"
+//       });
+//     }
+
+//     const salaries = await SupervisorSalary.find({ year: parseInt(year) })
+//       .populate('supervisorId', 'name email phone supervisorType')
+//       .sort({ month: 1, 'supervisorId.name': 1 });
+
+//     if (salaries.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No salary records found for the specified year"
+//       });
+//     }
+
+//     const period = `Year ${year}`;
+    
+//     // Group by supervisor
+//     const supervisors = {};
+//     salaries.forEach(salary => {
+//       if (!supervisors[salary.supervisorId._id]) {
+//         supervisors[salary.supervisorId._id] = {
+//           supervisor: salary.supervisorId,
+//           months: {},
+//           totalBasic: 0,
+//           totalNet: 0,
+//           totalPaid: 0
+//         };
+//       }
+      
+//       const supervisor = supervisors[salary.supervisorId._id];
+//       supervisor.months[salary.month] = {
+//         monthName: salary.monthName,
+//         basicSalary: salary.basicSalary,
+//         netSalary: salary.netMonthlySalary,
+//         paidAmount: salary.paidAmount,
+//         status: salary.status
+//       };
+      
+//       supervisor.totalBasic += salary.basicSalary;
+//       supervisor.totalNet += salary.netMonthlySalary;
+//       supervisor.totalPaid += salary.paidAmount;
+//     });
+
+//     if (format === 'pdf') {
+//       const doc = new PDFDocument();
+//       const buffers = [];
+      
+//       doc.on('data', buffers.push.bind(buffers));
+//       doc.on('end', () => {
+//         const pdfData = Buffer.concat(buffers);
+//         res.setHeader('Content-Type', 'application/pdf');
+//         res.setHeader('Content-Disposition', `attachment; filename=yearly_report_${year}.pdf`);
+//         res.send(pdfData);
+//       });
+
+//       doc.fontSize(18).text('Yearly Salary Report', { align: 'center' });
+//       doc.fontSize(12).text(`Year: ${year}`, { align: 'center' });
+//       doc.moveDown();
+
+//       // For each supervisor
+//       Object.values(supervisors).forEach(supervisor => {
+//         doc.fontSize(14).text(supervisor.supervisor.name, { underline: true });
+//         doc.moveDown(0.5);
+        
+//         // Table headers
+//         doc.font('Helvetica-Bold');
+//         doc.text('Month', 50);
+//         doc.text('Basic', 150);
+//         doc.text('Net Salary', 250);
+//         doc.text('Paid', 350);
+//         doc.text('Status', 450);
+//         doc.font('Helvetica');
+
+//         let y = doc.y + 20;
+        
+//         // Monthly data
+//         Object.entries(supervisor.months).forEach(([month, data]) => {
+//           doc.text(data.monthName, 50, y);
+//           doc.text(`₹${data.basicSalary.toFixed(2)}`, 150, y);
+//           doc.text(`₹${data.netSalary.toFixed(2)}`, 250, y);
+//           doc.text(`₹${data.paidAmount.toFixed(2)}`, 350, y);
+//           doc.text(data.status, 450, y);
+//           y += 20;
+//         });
+
+//         // Totals
+//         doc.font('Helvetica-Bold');
+//         doc.text('TOTAL:', 50, y);
+//         doc.text(`₹${supervisor.totalBasic.toFixed(2)}`, 150, y);
+//         doc.text(`₹${supervisor.totalNet.toFixed(2)}`, 250, y);
+//         doc.text(`₹${supervisor.totalPaid.toFixed(2)}`, 350, y);
+//         doc.font('Helvetica');
+        
+//         doc.moveDown(2);
+//       });
+
+//       doc.end();
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+      
+//       // Create a worksheet for each supervisor
+//       Object.values(supervisors).forEach(supervisor => {
+//         const worksheet = workbook.addWorksheet(supervisor.supervisor.name.substring(0, 31)); // Sheet name limit
+        
+//         worksheet.columns = [
+//           { header: 'Month', key: 'month', width: 15 },
+//           { header: 'Basic Salary', key: 'basic', width: 15 },
+//           { header: 'Net Salary', key: 'net', width: 15 },
+//           { header: 'Paid Amount', key: 'paid', width: 15 },
+//           { header: 'Status', key: 'status', width: 15 }
+//         ];
+
+//         Object.entries(supervisor.months).forEach(([month, data]) => {
+//           worksheet.addRow({
+//             month: data.monthName,
+//             basic: data.basicSalary,
+//             net: data.netSalary,
+//             paid: data.paidAmount,
+//             status: data.status
+//           });
+//         });
+
+//         // Add totals row
+//         worksheet.addRow([]);
+//         worksheet.addRow({
+//           month: 'TOTAL',
+//           basic: supervisor.totalBasic,
+//           net: supervisor.totalNet,
+//           paid: supervisor.totalPaid
+//         });
+//       });
+
+//       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//       res.setHeader('Content-Disposition', `attachment; filename=yearly_report_${year}.xlsx`);
+//       await workbook.xlsx.write(res);
+//       return res.end();
+//     } else {
+//       res.status(200).json({
+//         success: true,
+//         period,
+//         count: Object.keys(supervisors).length,
+//         data: Object.values(supervisors).map(supervisor => ({
+//           supervisor: supervisor.supervisor,
+//           months: supervisor.months,
+//           totals: {
+//             basicSalary: supervisor.totalBasic,
+//             netSalary: supervisor.totalNet,
+//             paidAmount: supervisor.totalPaid
+//           }
+//         }))
+//       });
+//     }
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // import mongoose from 'mongoose';
+// // import SupervisorSalary from '../models/SupervisorSalary.js';
+// // import Supervisor from '../models/Supervisor.js';
+// // import getNextSalaryId from '../utils/sequenceGenerator.js'; // Correct import path
+// // import exceljs from 'exceljs';
+// // import PDFDocument from 'pdfkit';
+
+// // // Helper functions
+// // const formatDate = (dateString) => {
+// //   if (!dateString) return null;
+// //   const date = new Date(dateString);
+// //   const day = String(date.getDate()).padStart(2, '0');
+// //   const month = String(date.getMonth() + 1).padStart(2, '0');
+// //   const year = date.getFullYear();
+// //   return `${day}/${month}/${year}`;
+// // };
+
+// // const getMonthName = (month) => {
+// //   const months = [
+// //     'January', 'February', 'March', 'April', 'May', 'June',
+// //     'July', 'August', 'September', 'October', 'November', 'December'
+// //   ];
+// //   return months[month - 1];
+// // };
+
+// // const getWeekNumber = (date) => {
+// //   const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+// //   const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+// //   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+// // };
+
+// // // // Auto-increment ID generator
+// // const getNextSequence = async (name) => {
+// //   const result = await mongoose.connection.db.collection('counters').findOneAndUpdate(
+// //     { _id: name },
+// //     { $inc: { seq: 1 } },
+// //     { returnOriginal: false, upsert: true }
+// //   );
+// //   return result.value.seq;
+// // };
+
+// // // 1. Create Monthly Salary
+// // export const createMonthlySalary = async (req, res) => {
+// //   try {
+// //     const { name, date, actualMonthlySalary, allowances = 0, deductions = 0, advanceSalary = 0, paidAmount = 0 } = req.body;
+
+// //     // Validate inputs
+// //     if (!name) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message: "Name is required"
+// //       });
+// //     }
+
+// //     // Parse the date to get month and year
+// //     const [day, month, year] = date.split('/').map(Number);
+// //     const monthName = getMonthName(month);
+
+// //     // Find supervisor by name
+// //     const supervisor = await Supervisor.findOne({ name });
+// //     if (!supervisor) {
+// //       return res.status(404).json({
+// //         success: false,
+// //         message: "Supervisor not found"
+// //       });
+// //     }
+
+// //     // Calculate working days and basic salary from attendance
+// //     const attendanceDays = supervisor.attendanceRecords.filter(record => {
+// //       const [recordDay, recordMonth, recordYear] = record.date.split('/').map(Number);
+// //       return recordMonth === month && recordYear === year;
+// //     });
+
+// //     const workingDays = attendanceDays.length;
+// //     const totalDays = new Date(year, month, 0).getDate();
+
+// //     // Calculate basic salary based on attendance
+// //     const basicSalary = attendanceDays.reduce((total, day) => {
+// //       const rates = {
+// //         Fullday: 1000,
+// //         Halfday: 500,
+// //         Overtime: 1500,
+// //         null: 0
+// //       };
+// //       return total + (rates[day.status] || 0);
+// //     }, 0);
+
+// //     // Calculate net monthly salary (use max of actual or attendance-based)
+// //     const netMonthlySalary = Math.max(
+// //       Number(actualMonthlySalary), 
+// //       basicSalary
+// //     ) + Number(allowances) - Number(deductions);
+
+// //     // Calculate balance
+// //     const balanceAmount = netMonthlySalary - Number(paidAmount) - Number(advanceSalary);
+
+// //     // Determine status
+// //     let status;
+// //     if (paidAmount <= 0) {
+// //       status = "Pending";
+// //     } else if (balanceAmount <= 0) {
+// //       status = "Paid";
+// //     } else {
+// //       status = "Partial";
+// //     }
+
+// //     // Generate auto-incremented ID
+// //     const _id = await getNextSequence('supervisorSalaryId');
+
+// //     // Create new salary record
+// //     const salaryRecord = new SupervisorSalary({
+// //       _id,
+// //       supervisorId: supervisor._id,
+// //       month,
+// //       monthName,
+// //       year,
+// //       date: formatDate(new Date(year, month - 1, day)),
+// //       actualMonthlySalary: Number(actualMonthlySalary),
+// //       basicSalary,
+// //       allowances: Number(allowances),
+// //       deductions: Number(deductions),
+// //       advanceSalary: Number(advanceSalary),
+// //       netMonthlySalary,
+// //       paidAmount: Number(paidAmount),
+// //       balanceAmount,
+// //       status,
+// //       workingDays,
+// //       totalDays,
+// //       attendanceRecords: attendanceDays
+// //     });
+
+// //     await salaryRecord.save();
+
+// //     res.status(201).json({
+// //       success: true,
+// //       data: {
+// //         ...salaryRecord.toObject(),
+// //         supervisorId: {
+// //           _id: supervisor._id,
+// //           name: supervisor.name,
+// //           email: supervisor.email,
+// //           phone: supervisor.phone,
+// //           supervisorType: supervisor.supervisorType
+// //         }
+// //       }
+// //     });
+
+// //   } catch (error) {
+// //     res.status(500).json({
+// //       success: false,
+// //       message: error.message
+// //     });
+// //   }
+// // };
+
+// // // 2. Get All Salary Records
+// // export const getAllSalaries = async (req, res) => {
+// //   try {
+// //     const salaries = await SupervisorSalary.find({})
+// //       .populate('supervisorId', 'name email phone supervisorType')
+// //       .sort({ _id: 1 });
+
+// //     res.status(200).json({
+// //       success: true,
+// //       count: salaries.length,
+// //       data: salaries.map(salary => ({
+// //         ...salary.toObject(),
+// //         supervisorId: {
+// //           _id: salary.supervisorId._id,
+// //           name: salary.supervisorId.name,
+// //           email: salary.supervisorId.email,
+// //           phone: salary.supervisorId.phone,
+// //           supervisorType: salary.supervisorId.supervisorType
+// //         }
+// //       }))
+// //     });
+// //   } catch (error) {
+// //     res.status(500).json({
+// //       success: false,
+// //       message: error.message
+// //     });
+// //   }
+// // };
+
+// // // 3. Get Salary by ID with PDF Receipt
+// // export const getSalaryById = async (req, res) => {
+// //   try {
+// //     const salary = await SupervisorSalary.findById(req.params.id)
+// //       .populate('supervisorId', 'name email phone supervisorType');
+
+// //     if (!salary) {
+// //       return res.status(404).json({
+// //         success: false,
+// //         message: "Salary record not found"
+// //       });
+// //     }
+
+// //     // Return JSON response if not requesting PDF
+// //     if (req.query.format !== 'pdf') {
+// //       return res.status(200).json({
+// //         success: true,
+// //         data: {
+// //           ...salary.toObject(),
+// //           supervisorId: {
+// //             _id: salary.supervisorId._id,
+// //             name: salary.supervisorId.name,
+// //             email: salary.supervisorId.email,
+// //             phone: salary.supervisorId.phone,
+// //             supervisorType: salary.supervisorId.supervisorType
+// //           }
+// //         }
+// //       });
+// //     }
+
+// //     // Generate PDF receipt
+// //     const doc = new PDFDocument();
+// //     const buffers = [];
+    
+// //     doc.on('data', buffers.push.bind(buffers));
+// //     doc.on('end', () => {
+// //       const pdfData = Buffer.concat(buffers);
+// //       res.setHeader('Content-Type', 'application/pdf');
+// //       res.setHeader('Content-Disposition', `attachment; filename=salary_receipt_${salary._id}.pdf`);
+// //       res.send(pdfData);
+// //     });
+
+// //     // PDF Content
+// //     doc.fontSize(18).text('Salary Receipt', { align: 'center' });
+// //     doc.moveDown();
+// //     doc.fontSize(12).text(`Receipt ID: ${salary._id}`, { align: 'left' });
+// //     doc.text(`Date: ${salary.date}`, { align: 'left' });
+// //     doc.moveDown();
+
+// //     // Supervisor Info
+// //     doc.fontSize(14).text('Supervisor Information', { underline: true });
+// //     doc.fontSize(12).text(`Name: ${salary.supervisorId.name}`);
+// //     doc.text(`ID: ${salary.supervisorId._id}`);
+// //     doc.text(`Type: ${salary.supervisorId.supervisorType}`);
+// //     doc.moveDown();
+
+// //     // Salary Details
+// //     doc.fontSize(14).text('Salary Details', { underline: true });
+// //     doc.fontSize(12).text(`Month: ${salary.monthName} ${salary.year}`);
+// //     doc.text(`Working Days: ${salary.workingDays}/${salary.totalDays}`);
+// //     doc.text(`Basic Salary: ₹${salary.basicSalary.toFixed(2)}`);
+// //     doc.text(`Allowances: ₹${salary.allowances.toFixed(2)}`);
+// //     doc.text(`Deductions: ₹${salary.deductions.toFixed(2)}`);
+// //     doc.text(`Advance: ₹${salary.advanceSalary.toFixed(2)}`);
+// //     doc.moveDown();
+
+// //     // Payment Info
+// //     doc.fontSize(14).text('Payment Information', { underline: true });
+// //     doc.fontSize(12).text(`Net Salary: ₹${salary.netMonthlySalary.toFixed(2)}`);
+// //     doc.text(`Paid Amount: ₹${salary.paidAmount.toFixed(2)}`);
+// //     doc.text(`Balance: ₹${salary.balanceAmount.toFixed(2)}`);
+// //     doc.text(`Status: ${salary.status}`);
+// //     doc.moveDown();
+
+// //     doc.fontSize(10).text('This is a computer generated receipt.', { align: 'center' });
+// //     doc.end();
+
+// //   } catch (error) {
+// //     res.status(500).json({
+// //       success: false,
+// //       message: error.message
+// //     });
+// //   }
+// // };
+
+// // // 4. Update Salary Record (PUT)
+// // export const updateSalary = async (req, res) => {
+// //   try {
+// //     const { id } = req.params;
+// //     const { name, date, actualMonthlySalary, allowances, deductions, advanceSalary, paidAmount, status } = req.body;
+
+// //     const salary = await SupervisorSalary.findById(id);
+// //     if (!salary) {
+// //       return res.status(404).json({
+// //         success: false,
+// //         message: "Salary record not found"
+// //       });
+// //     }
+
+// //     // Update all fields if provided
+// //     if (name) {
+// //       const supervisor = await Supervisor.findOne({ name });
+// //       if (!supervisor) {
+// //         return res.status(404).json({
+// //           success: false,
+// //           message: "Supervisor not found"
+// //         });
+// //       }
+// //       salary.supervisorId = supervisor._id;
+// //     }
+
+// //     if (date) {
+// //       const [day, month, year] = date.split('/').map(Number);
+// //       salary.date = formatDate(new Date(year, month - 1, day));
+// //       salary.month = month;
+// //       salary.monthName = getMonthName(month);
+// //       salary.year = year;
+// //     }
+
+// //     if (actualMonthlySalary !== undefined) salary.actualMonthlySalary = Number(actualMonthlySalary);
+// //     if (allowances !== undefined) salary.allowances = Number(allowances);
+// //     if (deductions !== undefined) salary.deductions = Number(deductions);
+// //     if (advanceSalary !== undefined) salary.advanceSalary = Number(advanceSalary);
+// //     if (paidAmount !== undefined) salary.paidAmount = Number(paidAmount);
+// //     if (status) salary.status = status;
+
+// //     // Recalculate values
+// //     if (actualMonthlySalary !== undefined || allowances !== undefined || deductions !== undefined) {
+// //       salary.netMonthlySalary = Math.max(
+// //         salary.actualMonthlySalary,
+// //         salary.basicSalary
+// //       ) + salary.allowances - salary.deductions;
+// //     }
+
+// //     if (paidAmount !== undefined || advanceSalary !== undefined || salary.netMonthlySalary !== undefined) {
+// //       salary.balanceAmount = salary.netMonthlySalary - salary.paidAmount - salary.advanceSalary;
+// //     }
+
+// //     salary.updatedAt = new Date();
+// //     await salary.save();
+
+// //     res.status(200).json({
+// //       success: true,
+// //       data: await salary.populate('supervisorId', 'name email phone supervisorType')
+// //     });
+// //   } catch (error) {
+// //     res.status(500).json({
+// //       success: false,
+// //       message: error.message
+// //     });
+// //   }
+// // };
+
+// // // 5. Delete Salary by ID
+// // export const deleteSalaryById = async (req, res) => {
+// //   try {
+// //     const salary = await SupervisorSalary.findByIdAndDelete(req.params.id);
+    
+// //     if (!salary) {
+// //       return res.status(404).json({
+// //         success: false,
+// //         message: "Salary record not found"
+// //       });
+// //     }
+
+// //     res.status(200).json({
+// //       success: true,
+// //       message: "Salary record deleted successfully"
+// //     });
+// //   } catch (error) {
+// //     res.status(500).json({
+// //       success: false,
+// //       message: error.message
+// //     });
+// //   }
+// // };
 
 
 

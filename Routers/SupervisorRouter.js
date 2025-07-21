@@ -8,6 +8,9 @@ import {
    getDailyReport,
    getWeeklyReport,
    getMonthlyReport,
+    getDailyAttendanceReport,
+    getDateRangeReport,
+    getMonthlyAttendanceReport,
   createSupervisor,
   getAllSupervisors,
   getSupervisorById,
@@ -28,7 +31,13 @@ router.put('/supervisors/bulk-by-status',authMiddleware, bulkUpdateAttendanceByS
 router.get('/supervisors/Attendance/reports/daily/:DD/:MM/:YYYY', getDailyReport);
 router.get('/supervisors/Attendance/reports/weekly/:MM/:YYYY/:week', getWeeklyReport);
 router.get('/supervisors/Attendance/reports/monthly/:MM/:YYYY', getMonthlyReport);
-// Apply attendance for all supervisors with specified status
+// Daily report route
+router.get('/supervisors/Attendance/reports/daily/range',authMiddleware, getDailyAttendanceReport);
+// Date range report route
+router.get('/supervisors/Attendance/reports/range',authMiddleware, getDateRangeReport);
+// Monthly report route
+router.get('/supervisors/Attendance/reports/monthly',authMiddleware, getMonthlyAttendanceReport);
+
 router.post("/supervisors", upload,authMiddleware, createSupervisor);
 router.get("/supervisors",authMiddleware, getAllSupervisors);
 router.get("/supervisors/:id",authMiddleware, getSupervisorById);

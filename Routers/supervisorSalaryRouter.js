@@ -10,7 +10,6 @@ import {
   deleteSalaryById,
   deleteAllSalaries,
   generateDailyReport,
-  generateWeeklyReport,
   generateMonthlyReport,
   generateYearlyReport
 } from '../Controllers/supervisorSalaryController.js';
@@ -32,7 +31,7 @@ router.delete('/supervisors/salary/:id',authMiddleware, deleteSalaryById);
 router.delete('/supervisors/salary',authMiddleware, deleteAllSalaries);
 // Reports
 router.get('/supervisors/salary/reports/daily/:DD/:MM/:YYYY',authMiddleware, generateDailyReport);
-router.get('/supervisors/salary/reports/weekly/:MM/:YYYY/:week',authMiddleware, generateWeeklyReport);
+// router.get('/supervisors/salary/reports/weekly/:MM/:YYYY/:week',authMiddleware, generateWeeklyReport);
 router.get('/supervisors/salary/reports/monthly/:MM/:YYYY',authMiddleware, generateMonthlyReport);
 router.get('/supervisors/salary/reports/yearly/:YYYY',authMiddleware, generateYearlyReport);
 
