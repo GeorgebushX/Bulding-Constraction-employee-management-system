@@ -599,6 +599,64 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
   }
 };
 
+
+// based on the status assign attendance for all supervisors
+// Bulk update attendance status for all supervisors (regardless of date)
+export const bulkUpdateAttendanceStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ["Fullday", "Halfday", "Overtime", null];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status value"
+      });
+    }
+
+    // Update currentAttendance status for all supervisors
+    const updateQuery = {
+      $set: {
+        'currentAttendance.status': status
+      }
+    };
+
+    // If status is provided, also add to attendanceRecords with current date
+    if (status) {
+      updateQuery.$push = {
+        attendanceRecords: {
+          date: new Date(), // Using current date
+          status
+        }
+      };
+    }
+
+    const result = await Supervisor.updateMany({}, updateQuery);
+
+    // Get updated records
+    const updatedSupervisors = await Supervisor.find()
+      .select('_id userId name currentAttendance')
+      .sort({ name: 1 });
+
+    return res.status(200).json({
+      success: true,
+      message: `Bulk attendance status updated to: ${status}`,
+      updatedCount: result.modifiedCount,
+      data: updatedSupervisors
+    });
+
+  } catch (error) {
+    console.error("Error in bulk attendance status update:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+
 // Get attendance details for a specific date
 export const getAttendanceByDate = async (req, res) => {
   try {

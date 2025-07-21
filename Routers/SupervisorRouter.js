@@ -4,7 +4,7 @@ import {
    updateSupervisorAttendance,
    bulkUpdateAttendanceByDate,
    getAttendanceByDate,
-   bulkUpdateAttendanceByStatus,
+   bulkUpdateAttendanceStatus,
    getDailyReport,
    getWeeklyReport,
    getMonthlyReport,
@@ -26,7 +26,7 @@ router.get("/supervisors/Attendance", authMiddleware, getSupervisorAttendance);
 router.put("/supervisors/Attendance/:supervisorId", authMiddleware, updateSupervisorAttendance);
 router.put('/supervisors/bulk-by-date',authMiddleware, bulkUpdateAttendanceByDate);
 router.get('/supervisors/:day/:month/:year',authMiddleware, getAttendanceByDate);
-router.put('/supervisors/bulk-by-status',authMiddleware, bulkUpdateAttendanceByStatus);
+router.put('/supervisors/bulk-by-status',authMiddleware, bulkUpdateAttendanceStatus);
 // Report routes
 router.get('/supervisors/Attendance/reports/daily/:DD/:MM/:YYYY', getDailyReport);
 router.get('/supervisors/Attendance/reports/weekly/:MM/:YYYY/:week', getWeeklyReport);
