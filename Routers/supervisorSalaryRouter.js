@@ -33,7 +33,7 @@ router.delete('/supervisors/salary/:id',authMiddleware, deleteSalaryById);
 router.delete('/supervisors/salary',authMiddleware, deleteAllSalaries);
 router.get('/supervisors/salaries',  getAllSupervisorSalaries);
 // Reports
-router.get('/supervisors/salaries/reports', getSalaryReport);
+router.get('/supervisors/salaries/reports',authMiddleware, getSalaryReport);
 //optional
 router.get('/supervisors/salary/reports/daily/:DD/:MM/:YYYY',authMiddleware, generateDailyReport);
 // router.get('/supervisors/salary/reports/weekly/:MM/:YYYY/:week',authMiddleware, generateWeeklyReport);
