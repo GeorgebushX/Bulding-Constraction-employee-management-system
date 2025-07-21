@@ -33,7 +33,9 @@ router.get('/supervisors/Attendance/reports/daily/:DD/:MM/:YYYY', getDailyReport
 router.get('/supervisors/Attendance/reports/weekly/:MM/:YYYY/:week', getWeeklyReport);
 router.get('/supervisors/Attendance/reports/monthly/:MM/:YYYY', getMonthlyReport);
 // Daily report route
+// Route without dateRange
 router.get('/supervisors/Attendance/reports/:dateRange', getDateRangeReport);
+router.get('/supervisors/Attendance/reports',authMiddleware, getDateRangeReport); // no dateRange
 router.get('/supervisors/Attendance/reports/daily/range',authMiddleware, getDailyAttendanceReport);
 // Date range report route
 router.get('/supervisors/Attendance/reports/range',authMiddleware, getDateRangeReportfor);

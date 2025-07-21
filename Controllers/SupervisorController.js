@@ -1980,8 +1980,12 @@ export const getMonthlyAttendanceReport = async (req, res) => {
 
 
 
+
+
+
+
 // @desc    Get attendance report with flexible date range from URL path
-// @route   GET /api/reports/:dateRange?
+// @route   GET /api/supervisors/Attendance/reports/:dateRange?
 export const getDateRangeReport = async (req, res) => {
   try {
     const { dateRange } = req.params;
@@ -2015,6 +2019,12 @@ export const getDateRangeReport = async (req, res) => {
         }
         const [day, month, year] = startDate.split('/');
         const parsedDate = new Date(`${year}-${month}-${day}`);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid date provided"
+          });
+        }
         dateFilter = {
           $gte: parsedDate,
           $lte: new Date(parsedDate.getTime() + 24 * 60 * 60 * 1000 - 1) // End of day
@@ -2037,7 +2047,23 @@ export const getDateRangeReport = async (req, res) => {
         
         const [endDay, endMonth, endYear] = endDate.split('/');
         const parsedEndDate = new Date(`${endYear}-${endMonth}-${endDay}`);
+        
+        if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid date provided"
+          });
+        }
+        
         parsedEndDate.setHours(23, 59, 59, 999); // Include entire end date
+        
+        // Validate date range
+        if (parsedStartDate > parsedEndDate) {
+          return res.status(400).json({
+            success: false,
+            message: "Start date must be before end date"
+          });
+        }
         
         dateFilter = {
           $gte: parsedStartDate,
@@ -2061,7 +2087,7 @@ export const getDateRangeReport = async (req, res) => {
       query.userId = supervisorId;
     }
 
-    // Get attendance data (same aggregation pipeline as before)
+    // Get attendance data
     const supervisors = await Supervisor.aggregate([
       { $match: query },
       {
@@ -2147,238 +2173,416 @@ export const getDateRangeReport = async (req, res) => {
   }
 };
 
-// (Keep the same helper functions for Excel and PDF generation)
 
-// Helper function to generate Excel report
-const generateExcelReport = async (res, supervisors, startDate, endDate) => {
-  const workbook = new exceljs.Workbook();
-  const worksheet = workbook.addWorksheet('Attendance Summary');
-  
-  // Add headers with styling
-  worksheet.columns = [
-    { header: 'ID', key: 'userId', width: 15, style: { font: { bold: true } } },
-    { header: 'Name', key: 'name', width: 25, style: { font: { bold: true } } },
-    { header: 'Days Present', key: 'daysPresent', width: 15, style: { font: { bold: true }, numFmt: '0' } },
-    { header: 'Total Days', key: 'totalDays', width: 15, style: { font: { bold: true }, numFmt: '0' } },
-    { header: 'Attendance Rate', key: 'attendanceRate', width: 20, style: { font: { bold: true }, numFmt: '0.00%' } }
-  ];
 
-  // Add data rows
-  supervisors.forEach(supervisor => {
-    const attendanceRate = supervisor.totalDays > 0 
-      ? supervisor.daysPresent / supervisor.totalDays
-      : 0;
 
-    worksheet.addRow({
-      userId: supervisor.userId,
-      name: supervisor.name,
-      daysPresent: supervisor.daysPresent,
-      totalDays: supervisor.totalDays,
-      attendanceRate
-    });
-  });
 
-  // Add conditional formatting for attendance rate
-  worksheet.addConditionalFormatting({
-    ref: 'E2:E' + (supervisors.length + 1),
-    rules: [
-      {
-        type: 'cellIs',
-        operator: 'greaterThanOrEqual',
-        formulae: [0.9],
-        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } } }
-      },
-      {
-        type: 'cellIs',
-        operator: 'lessThan',
-        formulae: [0.7],
-        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } } }
-      }
-    ]
-  });
 
-  // Add details sheet
-  const detailsSheet = workbook.addWorksheet('Attendance Details');
-  detailsSheet.columns = [
-    { header: 'ID', key: 'userId', width: 15 },
-    { header: 'Name', key: 'name', width: 25 },
-    { header: 'Date', key: 'date', width: 15 },
-    { header: 'Status', key: 'status', width: 15 }
-  ];
 
-  // Add details data
-  supervisors.forEach(supervisor => {
-    supervisor.attendanceDetails.forEach(detail => {
-      const formattedDate = new Date(detail.date).toLocaleDateString('en-GB');
-      detailsSheet.addRow({
-        userId: supervisor.userId,
-        name: supervisor.name,
-        date: formattedDate,
-        status: detail.status || 'Not Recorded'
-      });
-    });
-  });
 
-  // Format details sheet
-  detailsSheet.getRow(1).eachCell(cell => {
-    cell.font = { bold: true };
-    cell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFD9D9D9' }
-    };
-  });
 
-  // Auto-filter for details sheet
-  detailsSheet.autoFilter = {
-    from: 'A1',
-    to: 'D1'
-  };
 
-  // Set response headers
-  const dateRangeStr = generateFilenameSegment(startDate, endDate);
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  );
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename=attendance_report_${dateRangeStr}.xlsx`
-  );
 
-  return workbook.xlsx.write(res).then(() => res.end());
-};
+// // @desc    Get attendance report with flexible date range from URL path
+// // @route   GET /api/reports/:dateRange?
+// export const getDateRangeReport = async (req, res) => {
+//   try {
+//      const { day, month, year } = req.params;
+//     const dateRange = `${day}/${month}/${year}`;
+//     const { supervisorId, format = 'json' } = req.query;
 
-// Helper function to generate PDF report
-const generatePdfReport = (res, supervisors, startDate, endDate) => {
-  const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'portrait' });
-  const dateRangeStr = generateDateRangeTitle(startDate, endDate);
-  const filename = `attendance_report_${generateFilenameSegment(startDate, endDate)}.pdf`;
-  
-  // Set response headers
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  
-  doc.pipe(res);
+//     // Validate format
+//     const validFormats = ['json', 'excel', 'pdf'];
+//     if (!validFormats.includes(format)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid format parameter. Use json, excel, or pdf"
+//       });
+//     }
 
-  // Header
-  doc.fontSize(18).text('Attendance Report', { align: 'center' });
-  doc.fontSize(12).text(dateRangeStr, { align: 'center' });
-  doc.moveDown(2);
+//     // Date parsing and validation
+//     let dateFilter = {};
+//     let startDate, endDate;
 
-  // Summary Table
-  const summaryTop = doc.y;
-  const columnWidth = 100;
-  const columns = [
-    { title: 'ID', width: 60 },
-    { title: 'Name', width: 120 },
-    { title: 'Present', width: 80, align: 'right' },
-    { title: 'Total', width: 80, align: 'right' },
-    { title: 'Rate', width: 80, align: 'right' }
-  ];
-
-  // Draw table headers
-  let x = 50;
-  columns.forEach(column => {
-    doc.font('Helvetica-Bold')
-       .fontSize(10)
-       .text(column.title, x, summaryTop, {
-         width: column.width,
-         align: column.align || 'left'
-       });
-    x += column.width + 10;
-  });
-
-  // Draw table rows
-  let y = summaryTop + 25;
-  supervisors.forEach(supervisor => {
-    x = 50;
-    const attendanceRate = supervisor.totalDays > 0 
-      ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
-      : 'N/A';
-
-    const rowData = [
-      supervisor.userId,
-      supervisor.name,
-      supervisor.daysPresent.toString(),
-      supervisor.totalDays.toString(),
-      attendanceRate
-    ];
-
-    columns.forEach((column, index) => {
-      doc.font('Helvetica')
-         .fontSize(10)
-         .text(rowData[index], x, y, {
-           width: column.width,
-           align: column.align || 'left'
-         });
-      x += column.width + 10;
-    });
-
-    y += 20;
-    
-    // Add page break if needed
-    if (y > 700) {
-      doc.addPage();
-      y = 50;
-    }
-  });
-
-  // Detailed Records Section
-  doc.addPage();
-  doc.fontSize(16).text('Detailed Attendance Records', { align: 'center' });
-  doc.moveDown();
-
-  supervisors.forEach(supervisor => {
-    doc.fontSize(12)
-       .font('Helvetica-Bold')
-       .text(`${supervisor.userId} - ${supervisor.name}`, { underline: true });
-    doc.moveDown(0.5);
-
-    if (supervisor.attendanceDetails.length > 0) {
-      supervisor.attendanceDetails.forEach(detail => {
-        const formattedDate = new Date(detail.date).toLocaleDateString('en-GB');
-        doc.fontSize(10)
-           .font('Helvetica')
-           .text(`${formattedDate}: ${detail.status || 'Not Recorded'}`);
-        doc.moveDown(0.3);
+//     // Parse date range from URL path if provided
+//     if (dateRange) {
+//       const dateParts = dateRange.split('-');
+      
+//       if (dateParts.length === 1) {
+//         // Single date format: DD/MM/YYYY
+//         startDate = dateParts[0];
+//         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(startDate)) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid date format in URL. Use DD/MM/YYYY or DD/MM/YYYY-DD/MM/YYYY"
+//           });
+//         }
+//         const [day, month, year] = startDate.split('/');
+//         const parsedDate = new Date(`${year}-${month}-${day}`);
+//         dateFilter = {
+//           $gte: parsedDate,
+//           $lte: new Date(parsedDate.getTime() + 24 * 60 * 60 * 1000 - 1) // End of day
+//         };
+//       } 
+//       else if (dateParts.length === 2) {
+//         // Date range format: DD/MM/YYYY-DD/MM/YYYY
+//         [startDate, endDate] = dateParts;
         
-        // Add page break if needed
-        if (doc.y > 750) {
-          doc.addPage();
-          doc.moveDown();
-        }
-      });
-    } else {
-      doc.fontSize(10)
-         .font('Helvetica')
-         .text('No attendance records found for this period');
-    }
+//         // Validate both dates
+//         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(startDate) || !/^\d{2}\/\d{2}\/\d{4}$/.test(endDate)) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid date format in URL. Use DD/MM/YYYY-DD/MM/YYYY"
+//           });
+//         }
+        
+//         const [startDay, startMonth, startYear] = startDate.split('/');
+//         const parsedStartDate = new Date(`${startYear}-${startMonth}-${startDay}`);
+        
+//         const [endDay, endMonth, endYear] = endDate.split('/');
+//         const parsedEndDate = new Date(`${endYear}-${endMonth}-${endDay}`);
+//         parsedEndDate.setHours(23, 59, 59, 999); // Include entire end date
+        
+//         dateFilter = {
+//           $gte: parsedStartDate,
+//           $lte: parsedEndDate
+//         };
+//       }
+//       else {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid date range format. Use DD/MM/YYYY or DD/MM/YYYY-DD/MM/YYYY"
+//         });
+//       }
+//     } else {
+//       // No date range provided - get all records
+//       dateFilter = {};
+//     }
+
+//     // Build query
+//     const query = {};
+//     if (supervisorId) {
+//       query.userId = supervisorId;
+//     }
+
+//     // Get attendance data (same aggregation pipeline as before)
+//     const supervisors = await Supervisor.aggregate([
+//       { $match: query },
+//       {
+//         $project: {
+//           _id: 1,
+//           userId: 1,
+//           name: 1,
+//           photo: 1,
+//           rangeRecords: {
+//             $filter: {
+//               input: '$attendanceRecords',
+//               as: 'record',
+//               cond: {
+//                 $and: [
+//                   dateFilter.$gte ? { $gte: ['$$record.date', dateFilter.$gte] } : true,
+//                   dateFilter.$lte ? { $lte: ['$$record.date', dateFilter.$lte] } : true
+//                 ].filter(Boolean)
+//               }
+//             }
+//           }
+//         }
+//       },
+//       {
+//         $addFields: {
+//           daysPresent: {
+//             $size: {
+//               $filter: {
+//                 input: '$rangeRecords',
+//                 as: 'record',
+//                 cond: { $ne: ['$$record.status', null] }
+//               }
+//             }
+//           },
+//           totalDays: {
+//             $size: '$rangeRecords'
+//           },
+//           attendanceRate: {
+//             $cond: [
+//               { $gt: ['$totalDays', 0] },
+//               { $multiply: [{ $divide: ['$daysPresent', '$totalDays'] }, 100] },
+//               0
+//             ]
+//           },
+//           attendanceDetails: {
+//             $map: {
+//               input: '$rangeRecords',
+//               as: 'record',
+//               in: {
+//                 date: '$$record.date',
+//                 status: '$$record.status'
+//               }
+//             }
+//           }
+//         }
+//       },
+//       { $sort: { name: 1 } }
+//     ]);
+
+//     // Generate report based on requested format
+//     if (format === 'json') {
+//       return res.status(200).json({
+//         success: true,
+//         data: supervisors,
+//         dateRange: dateRange ? { 
+//           startDate: startDate || dateRange, 
+//           endDate: endDate || dateRange 
+//         } : { startDate: 'All', endDate: 'Records' },
+//         reportType: 'dateRange'
+//       });
+//     } else if (format === 'excel') {
+//       return generateExcelReport(res, supervisors, startDate || dateRange, endDate);
+//     } else if (format === 'pdf') {
+//       return generatePdfReport(res, supervisors, startDate || dateRange, endDate);
+//     }
+
+//   } catch (error) {
+//     console.error("Error generating date range report:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+// // (Keep the same helper functions for Excel and PDF generation)
+
+// // Helper function to generate Excel report
+// const generateExcelReport = async (res, supervisors, startDate, endDate) => {
+//   const workbook = new exceljs.Workbook();
+//   const worksheet = workbook.addWorksheet('Attendance Summary');
+  
+//   // Add headers with styling
+//   worksheet.columns = [
+//     { header: 'ID', key: 'userId', width: 15, style: { font: { bold: true } } },
+//     { header: 'Name', key: 'name', width: 25, style: { font: { bold: true } } },
+//     { header: 'Days Present', key: 'daysPresent', width: 15, style: { font: { bold: true }, numFmt: '0' } },
+//     { header: 'Total Days', key: 'totalDays', width: 15, style: { font: { bold: true }, numFmt: '0' } },
+//     { header: 'Attendance Rate', key: 'attendanceRate', width: 20, style: { font: { bold: true }, numFmt: '0.00%' } }
+//   ];
+
+//   // Add data rows
+//   supervisors.forEach(supervisor => {
+//     const attendanceRate = supervisor.totalDays > 0 
+//       ? supervisor.daysPresent / supervisor.totalDays
+//       : 0;
+
+//     worksheet.addRow({
+//       userId: supervisor.userId,
+//       name: supervisor.name,
+//       daysPresent: supervisor.daysPresent,
+//       totalDays: supervisor.totalDays,
+//       attendanceRate
+//     });
+//   });
+
+//   // Add conditional formatting for attendance rate
+//   worksheet.addConditionalFormatting({
+//     ref: 'E2:E' + (supervisors.length + 1),
+//     rules: [
+//       {
+//         type: 'cellIs',
+//         operator: 'greaterThanOrEqual',
+//         formulae: [0.9],
+//         style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } } }
+//       },
+//       {
+//         type: 'cellIs',
+//         operator: 'lessThan',
+//         formulae: [0.7],
+//         style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } } }
+//       }
+//     ]
+//   });
+
+//   // Add details sheet
+//   const detailsSheet = workbook.addWorksheet('Attendance Details');
+//   detailsSheet.columns = [
+//     { header: 'ID', key: 'userId', width: 15 },
+//     { header: 'Name', key: 'name', width: 25 },
+//     { header: 'Date', key: 'date', width: 15 },
+//     { header: 'Status', key: 'status', width: 15 }
+//   ];
+
+//   // Add details data
+//   supervisors.forEach(supervisor => {
+//     supervisor.attendanceDetails.forEach(detail => {
+//       const formattedDate = new Date(detail.date).toLocaleDateString('en-GB');
+//       detailsSheet.addRow({
+//         userId: supervisor.userId,
+//         name: supervisor.name,
+//         date: formattedDate,
+//         status: detail.status || 'Not Recorded'
+//       });
+//     });
+//   });
+
+//   // Format details sheet
+//   detailsSheet.getRow(1).eachCell(cell => {
+//     cell.font = { bold: true };
+//     cell.fill = {
+//       type: 'pattern',
+//       pattern: 'solid',
+//       fgColor: { argb: 'FFD9D9D9' }
+//     };
+//   });
+
+//   // Auto-filter for details sheet
+//   detailsSheet.autoFilter = {
+//     from: 'A1',
+//     to: 'D1'
+//   };
+
+//   // Set response headers
+//   const dateRangeStr = generateFilenameSegment(startDate, endDate);
+//   res.setHeader(
+//     'Content-Type',
+//     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+//   );
+//   res.setHeader(
+//     'Content-Disposition',
+//     `attachment; filename=attendance_report_${dateRangeStr}.xlsx`
+//   );
+
+//   return workbook.xlsx.write(res).then(() => res.end());
+// };
+
+// // Helper function to generate PDF report
+// const generatePdfReport = (res, supervisors, startDate, endDate) => {
+//   const doc = new PDFDocument({ margin: 50, size: 'A4', layout: 'portrait' });
+//   const dateRangeStr = generateDateRangeTitle(startDate, endDate);
+//   const filename = `attendance_report_${generateFilenameSegment(startDate, endDate)}.pdf`;
+  
+//   // Set response headers
+//   res.setHeader('Content-Type', 'application/pdf');
+//   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  
+//   doc.pipe(res);
+
+//   // Header
+//   doc.fontSize(18).text('Attendance Report', { align: 'center' });
+//   doc.fontSize(12).text(dateRangeStr, { align: 'center' });
+//   doc.moveDown(2);
+
+//   // Summary Table
+//   const summaryTop = doc.y;
+//   const columnWidth = 100;
+//   const columns = [
+//     { title: 'ID', width: 60 },
+//     { title: 'Name', width: 120 },
+//     { title: 'Present', width: 80, align: 'right' },
+//     { title: 'Total', width: 80, align: 'right' },
+//     { title: 'Rate', width: 80, align: 'right' }
+//   ];
+
+//   // Draw table headers
+//   let x = 50;
+//   columns.forEach(column => {
+//     doc.font('Helvetica-Bold')
+//        .fontSize(10)
+//        .text(column.title, x, summaryTop, {
+//          width: column.width,
+//          align: column.align || 'left'
+//        });
+//     x += column.width + 10;
+//   });
+
+//   // Draw table rows
+//   let y = summaryTop + 25;
+//   supervisors.forEach(supervisor => {
+//     x = 50;
+//     const attendanceRate = supervisor.totalDays > 0 
+//       ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+//       : 'N/A';
+
+//     const rowData = [
+//       supervisor.userId,
+//       supervisor.name,
+//       supervisor.daysPresent.toString(),
+//       supervisor.totalDays.toString(),
+//       attendanceRate
+//     ];
+
+//     columns.forEach((column, index) => {
+//       doc.font('Helvetica')
+//          .fontSize(10)
+//          .text(rowData[index], x, y, {
+//            width: column.width,
+//            align: column.align || 'left'
+//          });
+//       x += column.width + 10;
+//     });
+
+//     y += 20;
     
-    doc.moveDown();
-  });
+//     // Add page break if needed
+//     if (y > 700) {
+//       doc.addPage();
+//       y = 50;
+//     }
+//   });
 
-  doc.end();
-};
+//   // Detailed Records Section
+//   doc.addPage();
+//   doc.fontSize(16).text('Detailed Attendance Records', { align: 'center' });
+//   doc.moveDown();
 
-// Helper to generate filename segment
-const generateFilenameSegment = (startDate, endDate) => {
-  if (startDate && endDate && startDate !== endDate) {
-    return `${startDate.replace(/\//g, '-')}_to_${endDate.replace(/\//g, '-')}`;
-  }
-  if (startDate) {
-    return startDate.replace(/\//g, '-');
-  }
-  return 'all_records';
-};
+//   supervisors.forEach(supervisor => {
+//     doc.fontSize(12)
+//        .font('Helvetica-Bold')
+//        .text(`${supervisor.userId} - ${supervisor.name}`, { underline: true });
+//     doc.moveDown(0.5);
 
-// Helper to generate date range title
-const generateDateRangeTitle = (startDate, endDate) => {
-  if (startDate && endDate && startDate !== endDate) {
-    return `From ${startDate} to ${endDate}`;
-  }
-  if (startDate) {
-    return `Date: ${startDate}`;
-  }
-  return 'All Attendance Records';
-};
+//     if (supervisor.attendanceDetails.length > 0) {
+//       supervisor.attendanceDetails.forEach(detail => {
+//         const formattedDate = new Date(detail.date).toLocaleDateString('en-GB');
+//         doc.fontSize(10)
+//            .font('Helvetica')
+//            .text(`${formattedDate}: ${detail.status || 'Not Recorded'}`);
+//         doc.moveDown(0.3);
+        
+//         // Add page break if needed
+//         if (doc.y > 750) {
+//           doc.addPage();
+//           doc.moveDown();
+//         }
+//       });
+//     } else {
+//       doc.fontSize(10)
+//          .font('Helvetica')
+//          .text('No attendance records found for this period');
+//     }
+    
+//     doc.moveDown();
+//   });
+
+//   doc.end();
+// };
+
+// // Helper to generate filename segment
+// const generateFilenameSegment = (startDate, endDate) => {
+//   if (startDate && endDate && startDate !== endDate) {
+//     return `${startDate.replace(/\//g, '-')}_to_${endDate.replace(/\//g, '-')}`;
+//   }
+//   if (startDate) {
+//     return startDate.replace(/\//g, '-');
+//   }
+//   return 'all_records';
+// };
+
+// // Helper to generate date range title
+// const generateDateRangeTitle = (startDate, endDate) => {
+//   if (startDate && endDate && startDate !== endDate) {
+//     return `From ${startDate} to ${endDate}`;
+//   }
+//   if (startDate) {
+//     return `Date: ${startDate}`;
+//   }
+//   return 'All Attendance Records';
+// };
