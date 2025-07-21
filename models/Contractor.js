@@ -42,8 +42,7 @@ const contractorSchema = new mongoose.Schema({
       'Electrician Contractor', 
       'Painter Contractor', 
       'Tiles Contractor'
-    ],
-    default: "Centering Contractor" 
+    ]
   },
   bankName: { type: String },
   bankAccount: { type: String, trim: true },
