@@ -9,6 +9,7 @@ import {
    getWeeklyReport,
    getMonthlyReport,
     getDailyAttendanceReport,
+    getDateRangeReportfor,
     getDateRangeReport,
     getMonthlyAttendanceReport,
   createSupervisor,
@@ -33,6 +34,7 @@ router.get('/supervisors/Attendance/reports/weekly/:MM/:YYYY/:week', getWeeklyRe
 router.get('/supervisors/Attendance/reports/monthly/:MM/:YYYY', getMonthlyReport);
 // Daily report route
 router.get('/supervisors/Attendance/reports/daily/range',authMiddleware, getDailyAttendanceReport);
+router.get('/supervisors/Attendance/reports', getDailyAttendanceReport);
 // Date range report route
 router.get('/supervisors/Attendance/reports/range',authMiddleware, getDateRangeReport);
 // Monthly report route
