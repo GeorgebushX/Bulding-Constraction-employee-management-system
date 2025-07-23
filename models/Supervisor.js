@@ -206,7 +206,7 @@ const supervisorSchema = new mongoose.Schema({
   bankCode: { type: String, trim: true },
   photo: { type: String },
   supervisorIdProof: [{ type: String }],
-  
+  forDaySalary: { type: Number }, // Added forDaySalary field
   // Current day's attendance (for quick access)
   currentAttendance: {
     date: { type: String },

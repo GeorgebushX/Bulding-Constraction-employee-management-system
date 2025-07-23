@@ -20,13 +20,14 @@ const supervisorSalarySchema = new mongoose.Schema({
     year: {
         type: Number,  
     },
-    actualMonthlySalary: {
-        type: Number,
-        default: 0,
-    },
+    // actualMonthlySalary: {
+    //     type: Number,
+    //     default: 0,
+    // },
     basicSalary: {
         type: Number,  
     },
+    OvertimeSalary:{type:Number},
     allowances: {
         type: Number,
         default: 0,
@@ -67,6 +68,8 @@ const supervisorSalarySchema = new mongoose.Schema({
         type: Number,
         min: 0
     },
+    OvertimeDays:{
+        type:Number},
     totalDays: {
         type: Number,
         min: 1,

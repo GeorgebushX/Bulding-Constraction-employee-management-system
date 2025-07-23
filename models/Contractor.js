@@ -12,11 +12,36 @@ const addressSchema = new mongoose.Schema({
   country: { type: String }
 }, { _id: false });
 
+
+// Attendance record schema
+const attendanceRecordSchema = new mongoose.Schema({
+  date: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["Fullday", "Halfday", "Overtime", null],
+    required: true
+  },
+  recordedAt: { type: Date, 
+    default: Date.now,
+    get: formatDateToDDMMYYYY
+  }
+}, { _id: false });
+
+// Helper function to format dates as DD/MM/YYYY
+function formatDateToDDMMYYYY(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 const contractorSchema = new mongoose.Schema({
   _id: Number,
   userId: { type: Number, ref: "User", required: true },
+  supervisorId: { type: Number,ref: "Supervisor",required: true,},
   site: { type: Number, ref: 'Site' },
-  centeringSupervisor: { type: Number, ref: "CenteringSupervisor" },
   name: { type: String, required: true },
   password: { type: String },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
