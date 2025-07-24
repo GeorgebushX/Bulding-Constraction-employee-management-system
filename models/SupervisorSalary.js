@@ -8,6 +8,28 @@ const supervisorSalarySchema = new mongoose.Schema({
         ref: "Supervisor",
         required: true,
     },
+    startDate: {
+        type: String,
+    },
+    endDate: {
+        type: String},
+         weekNumber: {
+        type: Number,
+        min: 1,
+        max: 52
+    },
+    forDaySalary: {
+        type: Number,
+        required: true
+    },
+    HalfSalary: {
+        type: Number,
+        default: 400 // Default half day deduction amount
+    },
+    HalfDay: { // Changed from singular to plural if needed
+        type: Number,
+        default: 0
+    },
     week: {
         type: Number,
     },
@@ -20,10 +42,6 @@ const supervisorSalarySchema = new mongoose.Schema({
     year: {
         type: Number,  
     },
-    // actualMonthlySalary: {
-    //     type: Number,
-    //     default: 0,
-    // },
     basicSalary: {
         type: Number,  
     },
