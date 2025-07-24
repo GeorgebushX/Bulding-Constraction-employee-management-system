@@ -36,7 +36,7 @@ export const upload = multer({
     const mimetype = filetypes.test(file.mimetype);
     
 
-    if (extname && mimetype) {
+        if (extname && mimetype) {
       return cb(null, true);
     } else {
       cb(new Error('Only images (JPEG, JPG, PNG) and PDF files are allowed'));

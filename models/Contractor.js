@@ -74,6 +74,7 @@ const contractorSchema = new mongoose.Schema({
   bankCode: { type: String, trim: true },
   contractorIdProof: [{ type: String }],
   photo: { type: String },
+  forDaySalary: { type: Number }, // Added forDaySalary field
   createdAt: {
     type: String,
     default: function() { return this.formatDate(new Date()); }
@@ -116,6 +117,6 @@ contractorSchema.methods.formatDate = function(date) {
 // Apply auto-increment plugin
 contractorSchema.plugin(AutoIncrement, {id: 'contractor_id', inc_field: '_id'});
 
-const Contractor = mongoose.model('CenteringContractor', contractorSchema);
+const Contractor = mongoose.model('Contractor', contractorSchema);
 
 export default Contractor;
