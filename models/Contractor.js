@@ -15,11 +15,13 @@ const addressSchema = new mongoose.Schema({
 
 // Attendance record schema
 const attendanceRecordSchema = new mongoose.Schema({
-  date: { type: String, required: true },
-  status: {
-    type: String,
-    enum: ["Fullday", "Halfday", "Overtime", null],
-    required: true
+ currentAttendance: {
+    date: { type: String },
+    status: {
+      type: String,
+      enum: ["Fullday", "Halfday", "Overtime", null],
+      default: null
+    }
   },
   recordedAt: { type: Date, 
     default: Date.now,
@@ -75,6 +77,8 @@ const contractorSchema = new mongoose.Schema({
   contractorIdProof: [{ type: String }],
   photo: { type: String },
   forDaySalary: { type: Number }, // Added forDaySalary field
+// Historical attendance records
+  attendanceRecords: [attendanceRecordSchema],
   createdAt: {
     type: String,
     default: function() { return this.formatDate(new Date()); }

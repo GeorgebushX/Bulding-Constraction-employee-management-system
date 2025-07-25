@@ -1,424 +1,8 @@
-
-import Supervisor from "../models/Supervisor.js";
-import User from "../models/User.js";
-import Site from "../models/SiteDetails.js";
-import bcrypt from "bcrypt";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+// controllers/contractorAttendanceController.js
+import Contractor from "../models/Contractor.js";
 import cron from 'node-cron';
 import exceljs from 'exceljs';
 import pdfkit from 'pdfkit';
-
-
-// Ensure upload directory exists
-const uploadDir = path.join(process.cwd(), "public", "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-export const upload = multer({ 
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|pdf/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-    
-
-        if (extname && mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only images (JPEG, JPG, PNG) and PDF files are allowed'));
-    }
-  }
-}).fields([
-  { name: "photo", maxCount: 1 },
-  { name: "supervisorIdProof", maxCount: 5 },
-]);
-
-// POST - Create a new supervisor with site
-export const createSupervisor = async (req, res) => {
-  try {
-    const {
-      name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status,forDaySalary 
-    } = req.body;
-
-    // Validate required fields
-    if (!name || !email || !password || !site) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Required fields: name, email, password, site" 
-      });
-    }
-
-    // Validate site exists
-    const siteExists = await Site.findById(site);
-    if (!siteExists) {
-      return res.status(404).json({
-        success: false,
-        message: "Site not found"
-      });
-    }
-
-    // Check if email already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "User already registered with this email" 
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create and save new User
-    const newUser = new User({ 
-      name, 
-      email, 
-      password: hashedPassword, 
-      role: "Supervisor"
-    });
-    await newUser.save();
-
-    // Process uploaded files
-    const photo = req.files?.photo ? `/uploads/${req.files.photo[0].filename}` : null;
-    const supervisorIdProof = req.files?.supervisorIdProof 
-      ? req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`) 
-      : [];
-
-    // Parse address if it's a string
-    let parsedAddress = address;
-    try {
-      if (typeof address === 'string') parsedAddress = JSON.parse(address);
-    } catch (e) {
-      console.log("Address parsing error:", e);
-      return res.status(400).json({
-        success: false,
-        message: "Invalid address format. Please provide valid JSON for address"
-      });
-    }
-
-    // Create and save new Supervisor record
-    const newSupervisor = new Supervisor({
-      userId: newUser._id,
-      name,
-      dateOfBirth,
-      password: hashedPassword,
-      gender,
-      email,
-      phone,
-      alternatePhone,
-      address: parsedAddress,
-      role: "Supervisor",
-      supervisorType,
-      joiningDate,
-      bankName,
-      bankAccount,
-      bankCode,
-      supervisorIdProof,
-      photo,
-      site,
-      forDaySalary,
-      date,     // ✅ Now included
-  status    // ✅ Now included
-
-    });
-
-    await newSupervisor.save();
-
-    // Populate site details in the response
-    const populatedSupervisor = await Supervisor.findById(newSupervisor._id)
-      .populate('site')
-      .lean();
-
-    res.status(201).json({
-      success: true,
-      message: "Supervisor created successfully",
-      data: populatedSupervisor
-    });
-
-  } catch (error) {
-    console.error("Error creating supervisor:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
-    });
-  }
-};
-
-// GET - Get all supervisors with site details
-export const getAllSupervisors = async (req, res) => {
-  try {
-    const { search = '', site } = req.query;
-
-    const query = { role: "Supervisor" };
-    
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    if (site) {
-      query.site = site;
-    }
-
-    const supervisors = await Supervisor.find(query)
-      .populate({
-        path: 'site',
-      
-      })
-      .lean();
-
-    res.status(200).json({ 
-      success: true, 
-      data: supervisors
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Server Error", 
-      error: error.message 
-    });
-  }
-};
-
-// GET - Get supervisor by ID with site details
-export const getSupervisorById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    let supervisor;
-
-    // First try as numeric ID
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOne({ _id: Number(id), role: "Supervisor" })
-        .populate({
-          path: 'site'
-        })
-        .lean();
-    }
-    
-    // If not found, try as userId
-    if (!supervisor && !isNaN(id)) {
-      supervisor = await Supervisor.findOne({ userId: Number(id), role: "Supervisor" })
-        .populate({
-          path: 'site',
-        })
-        .lean();
-    }
-
-    if (!supervisor) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Supervisor not found" 
-      });
-    }
-
-    res.status(200).json({ 
-      success: true, 
-      data: supervisor
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
-    });
-  }
-};
-
-// PUT - Update supervisor by ID including site
-export const updateSupervisorById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    let supervisor;
-    
-    // First try as numeric ID (supervisor _id)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOne({ _id: Number(id), role: "Supervisor" });
-    }
-    
-    // If not found, try as userId
-    if (!supervisor && !isNaN(id)) {
-      supervisor = await Supervisor.findOne({ userId: Number(id), role: "Supervisor" });
-    }
-
-    if (!supervisor) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Supervisor not found" 
-      });
-    }
-
-    // Validate site if being updated
-    if (updateData.site) {
-      const siteExists = await Site.findById(updateData.site);
-      if (!siteExists) {
-        return res.status(404).json({
-          success: false,
-          message: "Site not found"
-        });
-      }
-      supervisor.site = updateData.site;
-    }
-
-    // Update other fields
-    const fieldsToUpdate = [
-      'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 'address',
-      'joiningDate', 'bankName', 'bankAccount', 'bankCode','forDaySalary'
-    ];
-    
-    fieldsToUpdate.forEach(field => {
-      if (updateData[field] !== undefined) {
-        supervisor[field] = updateData[field];
-      }
-    });
-
-    // Update password if provided
-    if (updateData.password) {
-      const hashedPassword = await bcrypt.hash(updateData.password, 10);
-      supervisor.password = hashedPassword;
-      await User.findOneAndUpdate(
-        { _id: supervisor.userId }, 
-        { password: hashedPassword }
-      );
-    }
-
-    // Update files if uploaded
-    if (req.files?.photo) {
-      if (supervisor.photo) {
-        const oldPhotoPath = path.join(process.cwd(), 'public', supervisor.photo);
-        if (fs.existsSync(oldPhotoPath)) {
-          fs.unlinkSync(oldPhotoPath);
-        }
-      }
-      supervisor.photo = `/uploads/${req.files.photo[0].filename}`;
-    }
-    
-    if (req.files?.supervisorIdProof) {
-      const newIdProofs = req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`);
-      supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
-    }
-
-    supervisor.updatedAt = new Date().toISOString();
-    await supervisor.save();
-    
-    // Update the associated User record
-    const userUpdate = {};
-    if (updateData.name) userUpdate.name = updateData.name;
-    if (updateData.email) userUpdate.email = updateData.email;
-    
-    if (Object.keys(userUpdate).length > 0) {
-      await User.findOneAndUpdate(
-        { _id: supervisor.userId }, 
-        { $set: userUpdate }
-      );
-    }
-
-    // Get updated supervisor with populated site
-    const updatedSupervisor = await Supervisor.findById(supervisor._id)
-      .populate({
-        path: 'site',
-      })
-      .lean();
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Supervisor updated successfully", 
-      data: updatedSupervisor 
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
-    });
-  }
-};
-
-// DELETE - Delete supervisor by ID
-export const deleteSupervisorById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    let supervisor;
-    
-    // First try as numeric ID (supervisor _id)
-    if (!isNaN(id)) {
-      supervisor = await Supervisor.findOneAndDelete({ _id: Number(id), role: "Supervisor" });
-    }
-    
-    // If not found, try as userId
-    if (!supervisor && !isNaN(id)) {
-      supervisor = await Supervisor.findOneAndDelete({ userId: Number(id), role: "Supervisor" });
-    }
-
-    if (!supervisor) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Supervisor not found" 
-      });
-    }
-
-    // Delete associated user
-    await User.findOneAndDelete({ _id: supervisor.userId });
-
-    // Delete associated files
-    if (supervisor.photo) {
-      const photoPath = path.join(process.cwd(), 'public', supervisor.photo);
-      if (fs.existsSync(photoPath)) {
-        fs.unlinkSync(photoPath);
-      }
-    }
-
-    if (supervisor.supervisorIdProof?.length > 0) {
-      supervisor.supervisorIdProof.forEach(proof => {
-        const proofPath = path.join(process.cwd(), 'public', proof);
-        if (fs.existsSync(proofPath)) {
-          fs.unlinkSync(proofPath);
-        }
-      });
-    }
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Supervisor deleted successfully" 
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
-      error: error.message 
-    });
-  }
-};
-
-
-
-
-
-
-
-
-// for attendace
 
 // Helper function to format date as DD/MM/YYYY
 const formatCurrentDate = () => {
@@ -434,8 +18,8 @@ const initializeAttendanceData = async () => {
   try {
     const currentDate = formatCurrentDate();
     
-    // Update all supervisors with missing date or outdated date
-    await Supervisor.updateMany(
+    // Update all contractors with missing date or outdated date
+    await Contractor.updateMany(
       {
         $or: [
           { 'currentAttendance.date': { $ne: currentDate } },
@@ -450,9 +34,9 @@ const initializeAttendanceData = async () => {
       }
     );
     
-    // console.log(`Attendance data initialized for date: ${currentDate}`);
+    console.log(`Contractor attendance data initialized for date: ${currentDate}`);
   } catch (error) {
-    console.error("Error initializing attendance data:", error);
+    console.error("Error initializing contractor attendance data:", error);
   }
 };
 
@@ -462,13 +46,12 @@ initializeAttendanceData();
 // Schedule daily reset at midnight
 cron.schedule('0 0 * * *', initializeAttendanceData);
 
-// Get all supervisors with attendance data
-export const getSupervisorAttendance = async (req, res) => {
+export const getContractorAttendance = async (req, res) => {
   try {
     const currentDate = formatCurrentDate();
     
-    // First ensure all records have today's date
-    await Supervisor.updateMany(
+    // Only initialize attendance for contractors without today's date
+    await Contractor.updateMany(
       {
         $or: [
           { 'currentAttendance.date': { $ne: currentDate } },
@@ -483,10 +66,30 @@ export const getSupervisorAttendance = async (req, res) => {
       }
     );
 
-    // Then fetch all supervisors
-    const data = await Supervisor.find()
-      .select('_id name photo currentAttendance')
+    // Fetch all contractors with their current data
+    const contractors = await Contractor.find()
+      .select('_id name photo currentAttendance attendanceRecords')
       .sort({ name: 1 });
+
+    // Transform the data
+    const data = contractors.map(contractor => {
+      // Use current status if date matches, otherwise look in records
+      const status = contractor.currentAttendance?.date === currentDate
+        ? contractor.currentAttendance.status
+        : contractor.attendanceRecords.find(r => 
+            new Date(r.date).toLocaleDateString('en-GB') === currentDate
+          )?.status || null;
+
+      return {
+        currentAttendance: {
+          date: currentDate,
+          status: status
+        },
+        _id: contractor._id,
+        name: contractor.name,
+        photo: contractor.photo
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -495,7 +98,7 @@ export const getSupervisorAttendance = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching supervisor attendance:", error);
+    console.error("Error fetching contractor attendance:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -504,41 +107,55 @@ export const getSupervisorAttendance = async (req, res) => {
   }
 };
 
-// Update attendance status for a supervisor
-export const updateSupervisorAttendance = async (req, res) => {
+// Update attendance status for a contractor
+export const updateContractorAttendance = async (req, res) => {
   try {
-    const { supervisorId } = req.params;
+    const { contractorId } = req.params;
     const { status } = req.body;
     const currentDate = formatCurrentDate();
 
-    const updatedSupervisor = await Supervisor.findOneAndUpdate(
-      { userId: supervisorId },
+    // First update the attendance
+    await Contractor.updateOne(
+      { _id: contractorId },
       { 
         $set: { 
           'currentAttendance.status': status,
           'currentAttendance.date': currentDate
         } 
-      },
-      { 
-        new: true,
-        select: '_id name photo currentAttendance' 
       }
     );
 
-    if (!updatedSupervisor) {
+    // Then fetch the updated contractor with all needed fields
+    const updatedContractor = await Contractor.findById(contractorId)
+      .select('_id name photo currentAttendance');
+
+    if (!updatedContractor) {
       return res.status(404).json({
         success: false,
-        message: "Supervisor not found"
+        message: "Contractor not found"
       });
+    }
+
+    // Ensure currentAttendance exists in the response
+    if (!updatedContractor.currentAttendance) {
+      updatedContractor.currentAttendance = {
+        date: currentDate,
+        status: status
+      };
     }
 
     return res.status(200).json({
       success: true,
-      data: updatedSupervisor
+      data: {
+        currentAttendance: updatedContractor.currentAttendance,
+        _id: updatedContractor._id,
+        name: updatedContractor.name,
+        photo: updatedContractor.photo
+      }
     });
 
   } catch (error) {
-    console.error("Error updating supervisor attendance:", error);
+    console.error("Error updating contractor attendance:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -547,10 +164,19 @@ export const updateSupervisorAttendance = async (req, res) => {
   }
 };
 
-// Bulk update attendance for all supervisors based on specific date
-export const bulkUpdateAttendanceByDate = async (req, res) => {
+
+export const bulkUpdateContractorAttendanceByDate = async (req, res) => {
   try {
     const { date, status } = req.body;
+
+    // Validate date format (DD/MM/YYYY)
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!dateRegex.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Use DD/MM/YYYY"
+      });
+    }
 
     // Validate status
     const validStatuses = ["Fullday", "Halfday", "Overtime", null];
@@ -561,52 +187,55 @@ export const bulkUpdateAttendanceByDate = async (req, res) => {
       });
     }
 
-    // Update all supervisors for the specified date
-    const updateQuery = {
-      $set: {
-        'currentAttendance.date': date,
-        'currentAttendance.status': status
+    // Update operation - store the result
+    const updateResult = await Contractor.updateMany(
+      {},
+      {
+        $set: {
+          'currentAttendance.date': date,
+          'currentAttendance.status': status
+        },
+        $push: status ? {
+          attendanceRecords: {
+            date,
+            status,
+            recordedAt: new Date()
+          }
+        } : undefined
       }
-    };
+    );
 
-    // Add to attendance records if status is provided
-    if (status) {
-      updateQuery.$push = {
-        attendanceRecords: {
-          date,
-          status
-        }
-      };
-    }
-
-    const result = await Supervisor.updateMany({}, updateQuery);
-
-    // Get updated records
-    const updatedSupervisors = await Supervisor.find()
+    // Fetch ALL contractors (not filtered by date) since we updated all
+    const updatedContractors = await Contractor.find({})
       .select('_id userId name currentAttendance')
       .sort({ name: 1 });
 
     return res.status(200).json({
       success: true,
       message: `Bulk attendance updated for date: ${date}`,
-      updatedCount: result.modifiedCount,
-      data: updatedSupervisors
+      updatedCount: updateResult.modifiedCount,
+      data: updatedContractors.map(contractor => ({
+        currentAttendance: contractor.currentAttendance || {
+          date: date,
+          status: status
+        },
+        _id: contractor._id,
+        userId: contractor.userId,
+        name: contractor.name
+      }))
     });
 
   } catch (error) {
-    console.error("Error in bulk attendance update by date:", error);
+    console.error("Bulk update error:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Failed to bulk update attendance",
       error: error.message
     });
   }
 };
-
-
-// based on the status assign attendance for all supervisors
-// Bulk update attendance status for all supervisors (regardless of date)
-export const bulkUpdateAttendanceStatus = async (req, res) => {
+// Bulk update attendance status for all contractors (regardless of date)
+export const bulkUpdateContractorAttendanceStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -619,7 +248,7 @@ export const bulkUpdateAttendanceStatus = async (req, res) => {
       });
     }
 
-    // Update currentAttendance status for all supervisors
+    // Update currentAttendance status for all contractors
     const updateQuery = {
       $set: {
         'currentAttendance.status': status
@@ -636,10 +265,10 @@ export const bulkUpdateAttendanceStatus = async (req, res) => {
       };
     }
 
-    const result = await Supervisor.updateMany({}, updateQuery);
+    const result = await Contractor.updateMany({}, updateQuery);
 
     // Get updated records
-    const updatedSupervisors = await Supervisor.find()
+    const updatedContractors = await Contractor.find()
       .select('_id userId name currentAttendance')
       .sort({ name: 1 });
 
@@ -647,7 +276,7 @@ export const bulkUpdateAttendanceStatus = async (req, res) => {
       success: true,
       message: `Bulk attendance status updated to: ${status}`,
       updatedCount: result.modifiedCount,
-      data: updatedSupervisors
+      data: updatedContractors
     });
 
   } catch (error) {
@@ -659,24 +288,23 @@ export const bulkUpdateAttendanceStatus = async (req, res) => {
     });
   }
 };
-
-
 // Get attendance details for a specific date
-export const getAttendanceByDate = async (req, res) => {
+// Get attendance details for a specific date
+export const getContractorAttendanceByDate = async (req, res) => {
   try {
-    
     const date = `${req.params.day}/${req.params.month}/${req.params.year}`;
 
     // Validate date format (DD/MM/YYYY)
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (!dateRegex.test(date)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid date format. Please use DD/MM/YYYY"
+        message: "Invalid date format. Use DD/MM/YYYY"
       });
     }
 
-    // Find all supervisors who have attendance records for the specified date
-    const supervisors = await Supervisor.aggregate([
+    // Get all contractors with either current attendance or historical records matching the date
+    const contractors = await Contractor.aggregate([
       {
         $match: {
           $or: [
@@ -691,40 +319,29 @@ export const getAttendanceByDate = async (req, res) => {
           userId: 1,
           name: 1,
           photo: 1,
-          currentStatus: {
+          status: {
             $cond: {
               if: { $eq: ['$currentAttendance.date', date] },
               then: '$currentAttendance.status',
-              else: null
-            }
-          },
-          historicalStatus: {
-            $let: {
-              vars: {
-                filteredRecords: {
-                  $filter: {
-                    input: '$attendanceRecords',
-                    as: 'record',
-                    cond: { $eq: ['$$record.date', date] }
-                  }
+              else: {
+                $let: {
+                  vars: {
+                    matchingRecord: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$attendanceRecords',
+                            as: 'record',
+                            cond: { $eq: ['$$record.date', date] }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  },
+                  in: '$$matchingRecord.status'
                 }
-              },
-              in: { $arrayElemAt: ['$$filteredRecords.status', 0] }
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 1,
-          userId: 1,
-          name: 1,
-          photo: 1,
-          status: {
-            $cond: {
-              if: { $ne: ['$currentStatus', null] },
-              then: '$currentStatus',
-              else: '$historicalStatus'
+              }
             }
           }
         }
@@ -734,12 +351,12 @@ export const getAttendanceByDate = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: supervisors,
+      data: contractors,
       date
     });
 
   } catch (error) {
-    console.error("Error fetching attendance by date:", error);
+    console.error("Error fetching contractor attendance by date:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -747,71 +364,23 @@ export const getAttendanceByDate = async (req, res) => {
     });
   }
 };
-
-
-
-// 2. Apply attendance for all supervisors with specified status (PUT)
-export const bulkUpdateAttendanceByStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const currentDate = formatCurrentDate();
-
-    // Validate status
-    const validStatuses = ["Fullday", "Halfday", "Overtime", null];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status value"
-      });
-    }
-
-    // Update all supervisors with current date
-    const result = await Supervisor.updateMany(
-      {},
-      {
-        $set: {
-          date: currentDate,
-          status
-        }
-      }
-    );
-
-    // Get updated records
-    const updatedSupervisors = await Supervisor.find()
-      .select('_id userId name date status')
-      .sort({ name: 1 });
-
-    return res.status(200).json({
-      success: true,
-      message: `Bulk attendance updated with status: ${status}`,
-      updatedCount: result.modifiedCount,
-      currentDate,
-      data: updatedSupervisors
-    });
-
-  } catch (error) {
-    console.error("Error in bulk attendance update by status:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-      error: error.message
-    });
-  }
-};
-
-
-// pdf and Excel sheet to download:
-
-// Helper function to get week range
-const getWeekRange = () => {
-  const now = new Date();
-  const dayOfWeek = now.getDay() || 7; // Adjust so Monday is 1, Sunday is 7
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - dayOfWeek + 1);
+// Helper function to get week range within a month
+const getWeekRangeInMonth = (year, month, weekNumber) => {
+  // Create date for the first day of the month
+  const firstDay = new Date(year, month - 1, 1);
   
-  const sunday = new Date(now);
-  sunday.setDate(now.getDate() + (7 - dayOfWeek));
+  // Calculate the first Monday of the month
+  let firstMonday = new Date(firstDay);
+  firstMonday.setDate(1 + ((8 - firstDay.getDay()) % 7));
   
+  // Calculate start and end dates for the requested week
+  const startDate = new Date(firstMonday);
+  startDate.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
+  
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  
+  // Format dates as DD/MM/YYYY
   const format = (date) => {
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -820,14 +389,16 @@ const getWeekRange = () => {
   };
   
   return {
-    start: format(monday),
-    end: format(sunday),
-    current: format(now)
+    start: format(startDate),
+    end: format(endDate),
+    month: month.toString().padStart(2, '0'),
+    year: year.toString(),
+    weekNumber
   };
 };
 
 // Generate Daily Report
-export const getDailyReport = async (req, res) => {
+export const getContractorDailyReport = async (req, res) => {
   try {
     const { DD, MM, YYYY } = req.params;
     const date = `${DD}/${MM}/${YYYY}`;
@@ -842,7 +413,7 @@ export const getDailyReport = async (req, res) => {
     }
 
     // Get attendance data for the specified date
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       {
         $match: {
           $or: [
@@ -901,7 +472,7 @@ export const getDailyReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         date,
         reportType: 'daily'
       });
@@ -918,11 +489,11 @@ export const getDailyReport = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
+      contractors.forEach(contractor => {
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          status: supervisor.status || 'Not Recorded'
+          userId: contractor.userId,
+          name: contractor.name,
+          status: contractor.status || 'Not Recorded'
         });
       });
       
@@ -933,7 +504,7 @@ export const getDailyReport = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=daily_report_${DD}_${MM}_${YYYY}.xlsx`
+        `attachment; filename=contractor_daily_report_${DD}_${MM}_${YYYY}.xlsx`
       );
       
       // Send the workbook
@@ -943,7 +514,7 @@ export const getDailyReport = async (req, res) => {
     } else if (format === 'pdf') {
       // Create PDF document
       const doc = new pdfkit();
-      const filename = `daily_report_${DD}_${MM}_${YYYY}.pdf`;
+      const filename = `contractor_daily_report_${DD}_${MM}_${YYYY}.pdf`;
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
@@ -953,15 +524,70 @@ export const getDailyReport = async (req, res) => {
       doc.pipe(res);
       
       // Add content
-      doc.fontSize(18).text(`Daily Attendance Report - ${date}`, { align: 'center' });
+      doc.fontSize(18).text(`Contractor Daily Attendance Report - ${date}`, { align: 'center' });
       doc.moveDown();
       
       doc.fontSize(12);
-      supervisors.forEach((supervisor, index) => {
-        doc.text(`${index + 1}. ${supervisor.name} - ${supervisor.status || 'Not Recorded'}`);
+      
+      // Initialize counters
+      const statusCounts = {
+        Fullday: 0,
+        Halfday: 0,
+        Overtime: 0,
+        Absent: 0
+      };
+
+      // Process each contractor and count statuses
+      contractors.forEach((contractor, index) => {
+        const status = contractor.status || 'Not Marked';
+        
+        // Update counters
+        if (status === 'Fullday') statusCounts.Fullday++;
+        else if (status === 'Halfday') statusCounts.Halfday++;
+        else if (status === 'Overtime') statusCounts.Overtime++;
+        else statusCounts.Absent++; // Counts both null and "Not Marked"
+        
+        doc.text(`${index + 1}. ${contractor.name} - ${status}`);
         doc.moveDown(0.5);
       });
-      
+
+      // Add summary section
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('Attendance Summary:', { underline: true });
+      doc.moveDown(0.3);
+      doc.font('Helvetica');
+
+      // Create summary table
+      const summaryY = doc.y;
+      const startX = 50;
+      const colWidth = 100;
+
+      // Table headers
+      doc.text('Status', startX, summaryY);
+      doc.text('Count', startX + colWidth, summaryY);
+      doc.moveDown(0.5);
+
+      // Table rows
+      doc.text('Fullday', startX);
+      doc.text(statusCounts.Fullday.toString(), startX + colWidth);
+      doc.moveDown(0.3);
+
+      doc.text('Halfday', startX);
+      doc.text(statusCounts.Halfday.toString(), startX + colWidth);
+      doc.moveDown(0.3);
+
+      doc.text('Overtime', startX);
+      doc.text(statusCounts.Overtime.toString(), startX + colWidth);
+      doc.moveDown(0.3);
+
+      doc.text('Absent/Not Marked', startX);
+      doc.text(statusCounts.Absent.toString(), startX + colWidth);
+      doc.moveDown(0.5);
+
+      // Add total count
+      doc.font('Helvetica-Bold')
+         .text(`Total Contractors: ${contractors.length}`, { align: 'right' });
+
       // Finalize PDF
       doc.end();
     } else {
@@ -971,7 +597,7 @@ export const getDailyReport = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error generating daily report:", error);
+    console.error("Error generating contractor daily report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -980,50 +606,8 @@ export const getDailyReport = async (req, res) => {
   }
 };
 
-// // Generate Weekly Report
-
-
-// Helper function to get week range within a month
-const getWeekRangeInMonth = (year, month, weekNumber) => {
-  // Create date for the first day of the month
-  const firstDay = new Date(year, month - 1, 1);
-  
-  // Calculate the first Monday of the month
-  let firstMonday = new Date(firstDay);
-  firstMonday.setDate(1 + ((8 - firstDay.getDay()) % 7));
-  
-  // Adjust for weeks starting on Sunday (if needed)
-  // For Monday-starting weeks (ISO standard), use the above
-  // For Sunday-starting weeks, use:
-  // let firstSunday = new Date(firstDay);
-  // firstSunday.setDate(1 - firstDay.getDay());
-  
-  // Calculate start and end dates for the requested week
-  const startDate = new Date(firstMonday);
-  startDate.setDate(firstMonday.getDate() + (weekNumber - 1) * 7);
-  
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 6);
-  
-  // Format dates as DD/MM/YYYY
-  const format = (date) => {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-  
-  return {
-    start: format(startDate),
-    end: format(endDate),
-    month: month.toString().padStart(2, '0'),
-    year: year.toString(),
-    weekNumber
-  };
-};
-
 // Generate Weekly Report within a specific month
-export const getWeeklyReport = async (req, res) => {
+export const getContractorWeeklyReport = async (req, res) => {
   try {
     const { MM, YYYY, week } = req.params;
     const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
@@ -1050,7 +634,7 @@ export const getWeeklyReport = async (req, res) => {
     const weekRange = getWeekRangeInMonth(parseInt(YYYY), parseInt(MM), weekNumber);
     
     // Get attendance data for the week
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       {
         $project: {
           _id: 1,
@@ -1094,7 +678,7 @@ export const getWeeklyReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         weekRange,
         reportType: 'weekly',
         weekInfo: {
@@ -1118,16 +702,16 @@ export const getWeeklyReport = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach(contractor => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          daysPresent: supervisor.daysPresent,
-          totalDays: supervisor.totalDays,
+          userId: contractor.userId,
+          name: contractor.name,
+          daysPresent: contractor.daysPresent,
+          totalDays: contractor.totalDays,
           attendanceRate
         });
       });
@@ -1139,7 +723,7 @@ export const getWeeklyReport = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.xlsx`
+        `attachment; filename=contractor_weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.xlsx`
       );
       
       // Send the workbook
@@ -1149,7 +733,7 @@ export const getWeeklyReport = async (req, res) => {
     } else if (format === 'pdf') {
       // Create PDF document
       const doc = new pdfkit();
-      const filename = `weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.pdf`;
+      const filename = `contractor_weekly_report_${weekRange.month}_${weekRange.year}_week${weekRange.weekNumber}.pdf`;
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
@@ -1160,7 +744,7 @@ export const getWeeklyReport = async (req, res) => {
       
       // Add content
       doc.fontSize(18).text(
-        `Weekly Attendance Report - ${weekRange.month}/${weekRange.year} (Week ${weekRange.weekNumber})`, 
+        `Contractor Weekly Attendance Report - ${weekRange.month}/${weekRange.year} (Week ${weekRange.weekNumber})`, 
         { align: 'center' }
       );
       doc.fontSize(14).text(
@@ -1170,13 +754,13 @@ export const getWeeklyReport = async (req, res) => {
       doc.moveDown();
       
       doc.fontSize(12);
-      supervisors.forEach((supervisor, index) => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach((contractor, index) => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
-        doc.text(`${index + 1}. ${supervisor.name}`);
-        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.text(`${index + 1}. ${contractor.name}`);
+        doc.text(`   Days Present: ${contractor.daysPresent} of ${contractor.totalDays} (${attendanceRate})`);
         doc.moveDown(0.5);
       });
       
@@ -1189,7 +773,7 @@ export const getWeeklyReport = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error generating weekly report:", error);
+    console.error("Error generating contractor weekly report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -1199,7 +783,7 @@ export const getWeeklyReport = async (req, res) => {
 };
 
 // Generate Monthly Report
-export const getMonthlyReport = async (req, res) => {
+export const getContractorMonthlyReport = async (req, res) => {
   try {
     const { MM, YYYY } = req.params;
     const format = req.query.format || 'json'; // Default to JSON, options: json, excel, pdf
@@ -1214,7 +798,7 @@ export const getMonthlyReport = async (req, res) => {
     }
 
     // Get attendance data for the month
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       {
         $project: {
           _id: 1,
@@ -1258,7 +842,7 @@ export const getMonthlyReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         monthYear,
         reportType: 'monthly'
       });
@@ -1277,16 +861,16 @@ export const getMonthlyReport = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach(contractor => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          daysPresent: supervisor.daysPresent,
-          totalDays: supervisor.totalDays,
+          userId: contractor.userId,
+          name: contractor.name,
+          daysPresent: contractor.daysPresent,
+          totalDays: contractor.totalDays,
           attendanceRate
         });
       });
@@ -1298,7 +882,7 @@ export const getMonthlyReport = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=monthly_report_${MM}_${YYYY}.xlsx`
+        `attachment; filename=contractor_monthly_report_${MM}_${YYYY}.xlsx`
       );
       
       // Send the workbook
@@ -1308,7 +892,7 @@ export const getMonthlyReport = async (req, res) => {
     } else if (format === 'pdf') {
       // Create PDF document
       const doc = new pdfkit();
-      const filename = `monthly_report_${MM}_${YYYY}.pdf`;
+      const filename = `contractor_monthly_report_${MM}_${YYYY}.pdf`;
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
@@ -1318,17 +902,17 @@ export const getMonthlyReport = async (req, res) => {
       doc.pipe(res);
       
       // Add content
-      doc.fontSize(18).text(`Monthly Attendance Report - ${MM}/${YYYY}`, { align: 'center' });
+      doc.fontSize(18).text(`Contractor Monthly Attendance Report - ${MM}/${YYYY}`, { align: 'center' });
       doc.moveDown();
       
       doc.fontSize(12);
-      supervisors.forEach((supervisor, index) => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach((contractor, index) => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
-        doc.text(`${index + 1}. ${supervisor.name}`);
-        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.text(`${index + 1}. ${contractor.name}`);
+        doc.text(`   Days Present: ${contractor.daysPresent} of ${contractor.totalDays} (${attendanceRate})`);
         doc.moveDown(0.5);
       });
       
@@ -1341,7 +925,7 @@ export const getMonthlyReport = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error generating monthly report:", error);
+    console.error("Error generating contractor monthly report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -1350,19 +934,10 @@ export const getMonthlyReport = async (req, res) => {
   }
 };
 
-
-
-
-
-// based on conditions:
-
-
-// @desc    Get daily attendance report for all supervisors or specific supervisor by ID
-// @route   POST /api/reports/daily
-// @access  Private
-export const getDailyAttendanceReport = async (req, res) => {
+// Get daily attendance report for all contractors or specific contractor by ID
+export const getContractorDailyAttendanceReport = async (req, res) => {
   try {
-    const { date, supervisorId, format = 'json' } = req.body;
+    const { date, contractorId, format = 'json' } = req.body;
 
     // Validate date format
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
@@ -1380,13 +955,13 @@ export const getDailyAttendanceReport = async (req, res) => {
       ]
     };
 
-    // Add supervisorId filter if provided
-    if (supervisorId) {
-      query.$or.push({ userId: supervisorId });
+    // Add contractorId filter if provided
+    if (contractorId) {
+      query.$or.push({ userId: contractorId });
     }
 
     // Get attendance data
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       { $match: query },
       {
         $project: {
@@ -1438,7 +1013,7 @@ export const getDailyAttendanceReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         date,
         reportType: 'daily'
       });
@@ -1454,11 +1029,11 @@ export const getDailyAttendanceReport = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
+      contractors.forEach(contractor => {
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          status: supervisor.status || 'Not Recorded'
+          userId: contractor.userId,
+          name: contractor.name,
+          status: contractor.status || 'Not Recorded'
         });
       });
       
@@ -1469,93 +1044,84 @@ export const getDailyAttendanceReport = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=daily_report_${date.replace(/\//g, '_')}.xlsx`
+        `attachment; filename=contractor_daily_report_${date.replace(/\//g, '_')}.xlsx`
       );
       
       return workbook.xlsx.write(res).then(() => res.end());
       
     } else if (format === 'pdf') {
       const doc = new pdfkit();
-      const filename = `daily_report_${date.replace(/\//g, '_')}.pdf`;
+      const filename = `contractor_daily_report_${date.replace(/\//g, '_')}.pdf`;
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       
       doc.pipe(res);
-      doc.fontSize(18).text(`Daily Attendance Report - ${date}`, { align: 'center' });
+      doc.fontSize(18).text(`Contractor Daily Attendance Report - ${date}`, { align: 'center' });
       doc.moveDown();
       
-      // doc.fontSize(12);
-      // supervisors.forEach((supervisor, index) => {
-      //   doc.text(`${index + 1}. ${supervisor.name} - ${supervisor.status || 'Not Recorded'}`);
-      //   doc.moveDown(0.5);
-      // });
-      
-      // doc.end();
+      doc.fontSize(12);
 
-doc.fontSize(12);
+      // Initialize counters
+      const statusCounts = {
+        Fullday: 0,
+        Halfday: 0,
+        Overtime: 0,
+        Absent: 0
+      };
 
-// Initialize counters
-const statusCounts = {
-  Fullday: 0,
-  Halfday: 0,
-  Overtime: 0,
-  Absent: 0
-};
+      // Process each contractor and count statuses
+      contractors.forEach((contractor, index) => {
+        const status = contractor.status || 'Not Marked';
+        
+        // Update counters
+        if (status === 'Fullday') statusCounts.Fullday++;
+        else if (status === 'Halfday') statusCounts.Halfday++;
+        else if (status === 'Overtime') statusCounts.Overtime++;
+        else statusCounts.Absent++;
+        
+        doc.text(`${index + 1}. ${contractor.name} - ${status}`);
+        doc.moveDown(0.5);
+      });
 
-// Process each supervisor and count statuses
-supervisors.forEach((supervisor, index) => {
-  const status = supervisor.status || 'Not Marked'; // Changed from "Not Recorded" to "Not Marked"
-  
-  // Update counters
-  if (status === 'Fullday') statusCounts.Fullday++;
-  else if (status === 'Halfday') statusCounts.Halfday++;
-  else if (status === 'Overtime') statusCounts.Overtime++;
-  else statusCounts.Absent++; // Counts both null and "Not Marked"
-  
-  doc.text(`${index + 1}. ${supervisor.name} - ${status}`);
-  doc.moveDown(0.5);
-});
+      // Add summary section
+      doc.moveDown();
+      doc.font('Helvetica-Bold').text('Attendance Summary:', { underline: true });
+      doc.moveDown(0.3);
+      doc.font('Helvetica');
 
-// Add summary section
-doc.moveDown();
-doc.font('Helvetica-Bold').text('Attendance Summary:', { underline: true });
-doc.moveDown(0.3);
-doc.font('Helvetica');
+      // Create summary table
+      const summaryY = doc.y;
+      const startX = 50;
+      const colWidth = 100;
 
-// Create summary table
-const summaryY = doc.y;
-const startX = 50;
-const colWidth = 100;
+      // Table headers
+      doc.text('Status', startX, summaryY);
+      doc.text('Count', startX + colWidth, summaryY);
+      doc.moveDown(0.5);
 
-// Table headers
-doc.text('Status', startX, summaryY);
-doc.text('Count', startX + colWidth, summaryY);
-doc.moveDown(0.5);
+      // Table rows
+      doc.text('Fullday', startX);
+      doc.text(statusCounts.Fullday.toString(), startX + colWidth);
+      doc.moveDown(0.3);
 
-// Table rows
-doc.text('Fullday', startX);
-doc.text(statusCounts.Fullday.toString(), startX + colWidth);
-doc.moveDown(0.3);
+      doc.text('Halfday', startX);
+      doc.text(statusCounts.Halfday.toString(), startX + colWidth);
+      doc.moveDown(0.3);
 
-doc.text('Halfday', startX);
-doc.text(statusCounts.Halfday.toString(), startX + colWidth);
-doc.moveDown(0.3);
+      doc.text('Overtime', startX);
+      doc.text(statusCounts.Overtime.toString(), startX + colWidth);
+      doc.moveDown(0.3);
 
-doc.text('Overtime', startX);
-doc.text(statusCounts.Overtime.toString(), startX + colWidth);
-doc.moveDown(0.3);
+      doc.text('Absent/Not Marked', startX);
+      doc.text(statusCounts.Absent.toString(), startX + colWidth);
+      doc.moveDown(0.5);
 
-doc.text('Absent/Not Marked', startX);
-doc.text(statusCounts.Absent.toString(), startX + colWidth);
-doc.moveDown(0.5);
+      // Add total count
+      doc.font('Helvetica-Bold')
+         .text(`Total Contractors: ${contractors.length}`, { align: 'right' });
 
-// Add total count
-doc.font('Helvetica-Bold')
-   .text(`Total Supervisors: ${supervisors.length}`, { align: 'right' });
-
-doc.end();
-
+      doc.end();
     } else {
       return res.status(400).json({
         success: false,
@@ -1563,7 +1129,7 @@ doc.end();
       });
     }
   } catch (error) {
-    console.error("Error generating daily report:", error);
+    console.error("Error generating contractor daily report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -1572,15 +1138,10 @@ doc.end();
   }
 };
 
-
-
-
-// @desc    Get attendance report between dates for all supervisors or specific supervisor by ID
-// @route   POST /api/reports/range
-// @access  Private
-export const getDateRangeReportfor = async (req, res) => {
+// Get attendance report between dates for all contractors or specific contractor by ID
+export const getContractorDateRangeReport = async (req, res) => {
   try {
-    const { startDate, endDate, supervisorId, format = 'json' } = req.body;
+    const { startDate, endDate, contractorId, format = 'json' } = req.body;
 
     // Validate date formats
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(startDate) || !/^\d{2}\/\d{2}\/\d{4}$/.test(endDate)) {
@@ -1592,12 +1153,12 @@ export const getDateRangeReportfor = async (req, res) => {
 
     // Build query
     const query = {};
-    if (supervisorId) {
-      query.userId = supervisorId;
+    if (contractorId) {
+      query.userId = contractorId;
     }
 
     // Get attendance data
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       { $match: query },
       {
         $project: {
@@ -1651,7 +1212,7 @@ export const getDateRangeReportfor = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         dateRange: { startDate, endDate },
         reportType: 'dateRange'
       });
@@ -1669,16 +1230,16 @@ export const getDateRangeReportfor = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach(contractor => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          daysPresent: supervisor.daysPresent,
-          totalDays: supervisor.totalDays,
+          userId: contractor.userId,
+          name: contractor.name,
+          daysPresent: contractor.daysPresent,
+          totalDays: contractor.totalDays,
           attendanceRate
         });
       });
@@ -1692,11 +1253,11 @@ export const getDateRangeReportfor = async (req, res) => {
         { header: 'Status', key: 'status', width: 15 }
       ];
       
-      supervisors.forEach(supervisor => {
-        supervisor.attendanceDetails.forEach(detail => {
+      contractors.forEach(contractor => {
+        contractor.attendanceDetails.forEach(detail => {
           detailsSheet.addRow({
-            userId: supervisor.userId,
-            name: supervisor.name,
+            userId: contractor.userId,
+            name: contractor.name,
             date: detail.date,
             status: detail.status || 'Not Recorded'
           });
@@ -1710,38 +1271,38 @@ export const getDateRangeReportfor = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.xlsx`
+        `attachment; filename=contractor_range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.xlsx`
       );
       
       return workbook.xlsx.write(res).then(() => res.end());
       
     } else if (format === 'pdf') {
       const doc = new pdfkit();
-      const filename = `range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.pdf`;
+      const filename = `contractor_range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.pdf`;
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       
       doc.pipe(res);
       doc.fontSize(18).text(
-        `Attendance Report - ${startDate} to ${endDate}`, 
+        `Contractor Attendance Report - ${startDate} to ${endDate}`, 
         { align: 'center' }
       );
       doc.moveDown();
       
       doc.fontSize(12);
-      supervisors.forEach((supervisor, index) => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach((contractor, index) => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
-        doc.text(`${index + 1}. ${supervisor.name}`);
-        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.text(`${index + 1}. ${contractor.name}`);
+        doc.text(`   Days Present: ${contractor.daysPresent} of ${contractor.totalDays} (${attendanceRate})`);
         
-        // Add details for each supervisor
-        if (supervisor.attendanceDetails.length > 0) {
+        // Add details for each contractor
+        if (contractor.attendanceDetails.length > 0) {
           doc.text('   Details:');
-          supervisor.attendanceDetails.forEach(detail => {
+          contractor.attendanceDetails.forEach(detail => {
             doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
           });
         }
@@ -1757,7 +1318,7 @@ export const getDateRangeReportfor = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error generating date range report:", error);
+    console.error("Error generating contractor date range report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -1766,15 +1327,10 @@ export const getDateRangeReportfor = async (req, res) => {
   }
 };
 
-
-
-
-// @desc    Get monthly attendance report for all supervisors or specific supervisor by ID
-// @route   POST /api/reports/monthly
-// @access  Private
-export const getMonthlyAttendanceReport = async (req, res) => {
+// Get monthly attendance report for all contractors or specific contractor by ID
+export const getContractorMonthlyAttendanceReport = async (req, res) => {
   try {
-    const { month, year, supervisorId, format = 'json' } = req.body;
+    const { month, year, contractorId, format = 'json' } = req.body;
 
     // Validate month and year
     const months = [
@@ -1794,12 +1350,12 @@ export const getMonthlyAttendanceReport = async (req, res) => {
 
     // Build query
     const query = {};
-    if (supervisorId) {
-      query.userId = supervisorId;
+    if (contractorId) {
+      query.userId = contractorId;
     }
 
     // Get attendance data
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       { $match: query },
       {
         $project: {
@@ -1853,7 +1409,7 @@ export const getMonthlyAttendanceReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         month,
         year,
         reportType: 'monthly'
@@ -1872,16 +1428,16 @@ export const getMonthlyAttendanceReport = async (req, res) => {
       ];
       
       // Add data
-      supervisors.forEach(supervisor => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach(contractor => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
         worksheet.addRow({
-          userId: supervisor.userId,
-          name: supervisor.name,
-          daysPresent: supervisor.daysPresent,
-          totalDays: supervisor.totalDays,
+          userId: contractor.userId,
+          name: contractor.name,
+          daysPresent: contractor.daysPresent,
+          totalDays: contractor.totalDays,
           attendanceRate
         });
       });
@@ -1895,11 +1451,11 @@ export const getMonthlyAttendanceReport = async (req, res) => {
         { header: 'Status', key: 'status', width: 15 }
       ];
       
-      supervisors.forEach(supervisor => {
-        supervisor.attendanceDetails.forEach(detail => {
+      contractors.forEach(contractor => {
+        contractor.attendanceDetails.forEach(detail => {
           detailsSheet.addRow({
-            userId: supervisor.userId,
-            name: supervisor.name,
+            userId: contractor.userId,
+            name: contractor.name,
             date: detail.date,
             status: detail.status || 'Not Recorded'
           });
@@ -1913,38 +1469,38 @@ export const getMonthlyAttendanceReport = async (req, res) => {
       );
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename=monthly_report_${month}_${year}.xlsx`
+        `attachment; filename=contractor_monthly_report_${month}_${year}.xlsx`
       );
       
       return workbook.xlsx.write(res).then(() => res.end());
       
     } else if (format === 'pdf') {
       const doc = new pdfkit();
-      const filename = `monthly_report_${month}_${year}.pdf`;
+      const filename = `contractor_monthly_report_${month}_${year}.pdf`;
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       
       doc.pipe(res);
       doc.fontSize(18).text(
-        `Monthly Attendance Report - ${month} ${year}`, 
+        `Contractor Monthly Attendance Report - ${month} ${year}`, 
         { align: 'center' }
       );
       doc.moveDown();
       
       doc.fontSize(12);
-      supervisors.forEach((supervisor, index) => {
-        const attendanceRate = supervisor.totalDays > 0 
-          ? (supervisor.daysPresent / supervisor.totalDays * 100).toFixed(2) + '%'
+      contractors.forEach((contractor, index) => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
           : 'N/A';
           
-        doc.text(`${index + 1}. ${supervisor.name}`);
-        doc.text(`   Days Present: ${supervisor.daysPresent} of ${supervisor.totalDays} (${attendanceRate})`);
+        doc.text(`${index + 1}. ${contractor.name}`);
+        doc.text(`   Days Present: ${contractor.daysPresent} of ${contractor.totalDays} (${attendanceRate})`);
         
-        // Add details for each supervisor
-        if (supervisor.attendanceDetails.length > 0) {
+        // Add details for each contractor
+        if (contractor.attendanceDetails.length > 0) {
           doc.text('   Details:');
-          supervisor.attendanceDetails.forEach(detail => {
+          contractor.attendanceDetails.forEach(detail => {
             doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
           });
         }
@@ -1960,7 +1516,7 @@ export const getMonthlyAttendanceReport = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error generating monthly report:", error);
+    console.error("Error generating contractor monthly report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -1969,16 +1525,11 @@ export const getMonthlyAttendanceReport = async (req, res) => {
   }
 };
 
-
-
-
-
-// @desc    Get attendance report with flexible date range from URL path
-// @route   GET /api/supervisors/Attendance/reports/:dateRange?
-export const getDateRangeReport = async (req, res) => {
+// Get attendance report with flexible date range from URL path
+export const getContractorDateRangeReportFromPath = async (req, res) => {
   try {
     const { dateRange } = req.params;
-    const { supervisorId, format = 'json' } = req.query;
+    const { contractorId, format = 'json' } = req.query;
 
     // Validate format
     const validFormats = ['json', 'excel', 'pdf'];
@@ -2072,12 +1623,12 @@ export const getDateRangeReport = async (req, res) => {
 
     // Build query
     const query = {};
-    if (supervisorId) {
-      query.userId = supervisorId;
+    if (contractorId) {
+      query.userId = contractorId;
     }
 
     // Get attendance data
-    const supervisors = await Supervisor.aggregate([
+    const contractors = await Contractor.aggregate([
       { $match: query },
       {
         $project: {
@@ -2139,7 +1690,7 @@ export const getDateRangeReport = async (req, res) => {
     if (format === 'json') {
       return res.status(200).json({
         success: true,
-        data: supervisors,
+        data: contractors,
         dateRange: dateRange ? { 
           startDate: startDate || dateRange, 
           endDate: endDate || dateRange 
@@ -2147,13 +1698,139 @@ export const getDateRangeReport = async (req, res) => {
         reportType: 'dateRange'
       });
     } else if (format === 'excel') {
-      return generateExcelReport(res, supervisors, startDate || dateRange, endDate);
+      const workbook = new exceljs.Workbook();
+      const worksheet = workbook.addWorksheet('Date Range Attendance');
+      
+      // Add headers
+      worksheet.columns = [
+        { header: 'ID', key: 'userId', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Days Present', key: 'daysPresent', width: 15 },
+        { header: 'Total Days', key: 'totalDays', width: 15 },
+        { header: 'Attendance Rate', key: 'attendanceRate', width: 20 }
+      ];
+      
+      // Add data
+      contractors.forEach(contractor => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        worksheet.addRow({
+          userId: contractor.userId,
+          name: contractor.name,
+          daysPresent: contractor.daysPresent,
+          totalDays: contractor.totalDays,
+          attendanceRate
+        });
+      });
+      
+      // Add details sheet
+      const detailsSheet = workbook.addWorksheet('Details');
+      detailsSheet.columns = [
+        { header: 'ID', key: 'userId', width: 10 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Date', key: 'date', width: 15 },
+        { header: 'Status', key: 'status', width: 15 }
+      ];
+      
+      contractors.forEach(contractor => {
+        contractor.attendanceDetails.forEach(detail => {
+          detailsSheet.addRow({
+            userId: contractor.userId,
+            name: contractor.name,
+            date: detail.date,
+            status: detail.status || 'Not Recorded'
+          });
+        });
+      });
+      
+      // Set response headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      
+      let filename;
+      if (dateRange) {
+        if (startDate && endDate) {
+          filename = `contractor_range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.xlsx`;
+        } else {
+          filename = `contractor_daily_report_${dateRange.replace(/\//g, '_')}.xlsx`;
+        }
+      } else {
+        filename = 'contractor_all_attendance_records.xlsx';
+      }
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      return workbook.xlsx.write(res).then(() => res.end());
+      
     } else if (format === 'pdf') {
-      return generatePdfReport(res, supervisors, startDate || dateRange, endDate);
+      const doc = new pdfkit();
+      
+      let filename;
+      if (dateRange) {
+        if (startDate && endDate) {
+          filename = `contractor_range_report_${startDate.replace(/\//g, '_')}_to_${endDate.replace(/\//g, '_')}.pdf`;
+        } else {
+          filename = `contractor_daily_report_${dateRange.replace(/\//g, '_')}.pdf`;
+        }
+      } else {
+        filename = 'contractor_all_attendance_records.pdf';
+      }
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      doc.pipe(res);
+      
+      // Set title based on date range
+      if (dateRange) {
+        if (startDate && endDate) {
+          doc.fontSize(18).text(
+            `Contractor Attendance Report - ${startDate} to ${endDate}`, 
+            { align: 'center' }
+          );
+        } else {
+          doc.fontSize(18).text(
+            `Contractor Daily Attendance Report - ${dateRange}`, 
+            { align: 'center' }
+          );
+        }
+      } else {
+        doc.fontSize(18).text(
+          'All Contractor Attendance Records', 
+          { align: 'center' }
+        );
+      }
+      
+      doc.moveDown();
+      
+      doc.fontSize(12);
+      contractors.forEach((contractor, index) => {
+        const attendanceRate = contractor.totalDays > 0 
+          ? (contractor.daysPresent / contractor.totalDays * 100).toFixed(2) + '%'
+          : 'N/A';
+          
+        doc.text(`${index + 1}. ${contractor.name}`);
+        doc.text(`   Days Present: ${contractor.daysPresent} of ${contractor.totalDays} (${attendanceRate})`);
+        
+        // Add details for each contractor
+        if (contractor.attendanceDetails.length > 0) {
+          doc.text('   Details:');
+          contractor.attendanceDetails.forEach(detail => {
+            doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
+          });
+        }
+        
+        doc.moveDown(0.5);
+      });
+      
+      doc.end();
     }
-
   } catch (error) {
-    console.error("Error generating date range report:", error);
+    console.error("Error generating contractor date range report:", error);
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -2161,4 +1838,3 @@ export const getDateRangeReport = async (req, res) => {
     });
   }
 };
-

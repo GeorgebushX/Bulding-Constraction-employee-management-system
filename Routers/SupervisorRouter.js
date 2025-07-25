@@ -10,7 +10,7 @@ import {
    getMonthlyReport,
     getDailyAttendanceReport,
     getDateRangeReportfor,
-    getDateRangeReport,
+    getDateRangeReport, 
     getMonthlyAttendanceReport,
   createSupervisor,
   getAllSupervisors,

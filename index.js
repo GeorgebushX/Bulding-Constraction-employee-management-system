@@ -27,7 +27,7 @@ import electriciansupervisorRouter from "././Routers/supervisor/electricianSuper
 import tilessupervisorRouter from "././Routers/supervisor/tilesSupervisorRouter.js"
 
 import supervisorRouter from "./Routers/SupervisorRouter.js"
-
+import contractorAttendance from "./Routers/contractorAttendanceRouter.js"
 import centeringcontractorRouter from "./Routers/contractorRouter.js"
 import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
@@ -70,6 +70,7 @@ app.use("/api",siteRouter)
 // app.use("/api",attendanceSupervisor)
 app.use("/api",supervisorSalary)
 app.use("/api",changePassword)
+app.use("/api",contractorAttendance)
 
 
 // start the server
