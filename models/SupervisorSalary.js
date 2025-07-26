@@ -8,6 +8,10 @@ const supervisorSalarySchema = new mongoose.Schema({
         ref: "Supervisor",
         required: true,
     },
+     forDaySalary: {
+        type: Number,
+        required: true
+    },
     startDate: {
         type: String,
     },
@@ -18,15 +22,14 @@ const supervisorSalarySchema = new mongoose.Schema({
         min: 1,
         max: 52
     },
-    forDaySalary: {
+    workingDays: {
         type: Number,
-        required: true
+        min: 0
     },
-    HalfSalary: {
-        type: Number,
-        default: 400 // Default half day deduction amount
+    OvertimeDaysCount:{
+        type:Number
     },
-    HalfDay: { // Changed from singular to plural if needed
+     HalfDaysCount: { // Changed from singular to plural if needed
         type: Number,
         default: 0
     },
@@ -45,7 +48,13 @@ const supervisorSalarySchema = new mongoose.Schema({
     basicSalary: {
         type: Number,  
     },
-    OvertimeSalary:{type:Number},
+    OvertimeOneDaySalary:{
+        type:Number
+    },
+     HalfdayOneDaySalary: {
+        type: Number,
+        default: 400 // Default half day deduction amount
+    },
     allowances: {
         type: Number,
         default: 0,
@@ -82,12 +91,7 @@ const supervisorSalarySchema = new mongoose.Schema({
     date: {
         type: String,
     },
-    workingDays: {
-        type: Number,
-        min: 0
-    },
-    OvertimeDays:{
-        type:Number},
+ 
     totalDays: {
         type: Number,
         min: 1,
