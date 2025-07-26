@@ -52,7 +52,7 @@ export const createSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status,forDaySalary 
+      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status,perDaySalary 
     } = req.body;
 
     // Validate required fields
@@ -131,7 +131,7 @@ export const createSupervisor = async (req, res) => {
       supervisorIdProof,
       photo,
       site,
-      forDaySalary,
+      perDaySalary,
       date,     // ✅ Now included
   status    // ✅ Now included
 
@@ -283,7 +283,7 @@ export const updateSupervisorById = async (req, res) => {
     // Update other fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 'address',
-      'joiningDate', 'bankName', 'bankAccount', 'bankCode','forDaySalary'
+      'joiningDate', 'bankName', 'bankAccount', 'bankCode','perDaySalary'
     ];
     
     fieldsToUpdate.forEach(field => {

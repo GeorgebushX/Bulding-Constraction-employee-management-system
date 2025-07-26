@@ -92,7 +92,7 @@ export const createContractor = async (req, res) => {
   try {
     const {
       name, email, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, forDaySalary,
+      joiningDate, bankName, bankAccount, bankCode, password, perDaySalary,
       supervisorName, contractorRole
     } = req.body;
 
@@ -192,7 +192,7 @@ export const createContractor = async (req, res) => {
       bankCode,
       contractorIdProof,
       photo,
-      forDaySalary,
+      perDaySalary,
       site: site._id,
       supervisorId: supervisor._id
     });
@@ -409,7 +409,7 @@ export const updateContractorById = async (req, res) => {
     const fieldsToUpdate = [
       'name', 'email', 'gender', 'phone', 'alternatePhone', 'address',
       'joiningDate', 'bankName', 'bankAccount', 'bankCode', 'contractorRole',
-      'forDaySalary'
+      'perDaySalary'
     ];
     
     fieldsToUpdate.forEach(field => {

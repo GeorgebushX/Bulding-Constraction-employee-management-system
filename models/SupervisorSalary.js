@@ -8,7 +8,7 @@ const supervisorSalarySchema = new mongoose.Schema({
         ref: "Supervisor",
         required: true,
     },
-     forDaySalary: {
+     perDaySalary: {
         type: Number,
         required: true
     },

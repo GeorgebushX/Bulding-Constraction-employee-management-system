@@ -76,7 +76,7 @@
 //   bankCode: { type: String, trim: true },
 //   contractorIdProof: [{ type: String }],
 //   photo: { type: String },
-//   forDaySalary: { type: Number }, // Added forDaySalary field
+//   perDaySalary: { type: Number }, // Added perDaySalary field
 // // Historical attendance records
 //   attendanceRecords: [attendanceRecordSchema],
 //   createdAt: {
@@ -209,7 +209,7 @@ const contractorSchema = new mongoose.Schema({
   bankCode: { type: String, trim: true },
   contractorIdProof: [{ type: String }],
   photo: { type: String },
-  forDaySalary: { type: Number },
+  perDaySalary: { type: Number },
 
   // ✅ Add top-level currentAttendance for daily tracking
   currentAttendance: {

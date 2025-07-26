@@ -75,10 +75,10 @@ export const createWeeklySalary = async (req, res) => {
         const HalfDaysCount = attendanceRecords.filter(r => r.status === 'Halfday').length;
 
         // Get salary rates from supervisor
-        const forDaySalary = supervisor.forDaySalary || 1000;
+        const perDaySalary = supervisor.perDaySalary || 1000;
 
         // Calculate salaries
-        const basicSalary = (workingDays * forDaySalary) + 
+        const basicSalary = (workingDays * perDaySalary) + 
                           (OvertimeDaysCount * OvertimeOneDaySalary) - 
                           (HalfDaysCount * HalfdayOneDaySalary);
 
@@ -111,7 +111,7 @@ export const createWeeklySalary = async (req, res) => {
             month,
             monthName,
             year,
-            forDaySalary,
+            perDaySalary,
             OvertimeOneDaySalary,
             HalfdayOneDaySalary,
             workingDays,
@@ -138,7 +138,7 @@ export const createWeeklySalary = async (req, res) => {
                     email: supervisor.email,
                     phone: supervisor.phone,
                     supervisorType: supervisor.supervisorType,
-                    forDaySalary: supervisor.forDaySalary
+                    perDaySalary: supervisor.perDaySalary
                 }
             }
         });
@@ -174,7 +174,7 @@ export const getAllSalaries = async (req, res) => {
                 email: salary.supervisorId.email || null,
                 phone: salary.supervisorId.phone || null,
                 supervisorType: salary.supervisorId.supervisorType || null,
-                forDaySalary: salary.supervisorId.forDaySalary || null
+                perDaySalary: salary.supervisorId.perDaySalary || null
             } : {
                 _id: null,
                 name: 'Unknown Supervisor',
@@ -262,7 +262,7 @@ export const getSalaryById = async (req, res) => {
             doc.moveDown();
             
             doc.text('Salary Details:');
-            doc.text(`Basic Salary: ₹${salary.forDaySalary.toFixed(2)}`);
+            doc.text(`Basic Salary: ₹${salary.perDaySalary.toFixed(2)}`);
             doc.text(`Overtime: ₹${salary.OvertimeOneDaySalary.toFixed(2)} x ${salary.OvertimeDaysCount} days`);
             doc.text(`Half Days: ${salary.HalfDaysCount} days (₹${salary.HalfdayOneDaySalary.toFixed(2)} deduction)`);
             doc.text(`Allowances: ₹${salary.allowances.toFixed(2)}`);
@@ -342,7 +342,7 @@ export const updateSalary = async (req, res) => {
         if (status) salary.status = status;
 
         // Recalculate net salary and balance
-        const basicSalary = (salary.workingDays * salary.forDaySalary) + 
+        const basicSalary = (salary.workingDays * salary.perDaySalary) + 
                           (salary.OvertimeDaysCount * salary.OvertimeOneDaySalary) - 
                           (salary.HalfDaysCount * salary.HalfdayOneDaySalary);
 
@@ -475,10 +475,10 @@ export const assignSalaryToAllSupervisors = async (req, res) => {
                 const HalfDaysCount = attendanceRecords.filter(r => r.status === 'Halfday').length;
 
                 // Get salary rates from supervisor
-                const forDaySalary = supervisor.forDaySalary || 1000;
+                const perDaySalary = supervisor.perDaySalary || 1000;
 
                 // Calculate salaries
-                const basicSalary = (workingDays * forDaySalary) + 
+                const basicSalary = (workingDays * perDaySalary) + 
                                   (OvertimeDaysCount * OvertimeOneDaySalary) - 
                                   (HalfDaysCount * HalfdayOneDaySalary);
 
@@ -511,7 +511,7 @@ export const assignSalaryToAllSupervisors = async (req, res) => {
                     month,
                     monthName,
                     year,
-                    forDaySalary,
+                    perDaySalary,
                     OvertimeOneDaySalary,
                     HalfdayOneDaySalary,
                     workingDays,
@@ -600,7 +600,7 @@ export const getSalariesByDate = async (req, res) => {
                     email: salary.supervisorId.email,
                     phone: salary.supervisorId.phone,
                     supervisorType: salary.supervisorId.supervisorType,
-                    forDaySalary: salary.supervisorId.forDaySalary
+                    perDaySalary: salary.supervisorId.perDaySalary
                 }
             }))
         });
@@ -667,7 +667,7 @@ export const getSalariesByMonthYear = async (req, res) => {
                         email: salary.supervisorId.email,
                         phone: salary.supervisorId.phone,
                         supervisorType: salary.supervisorId.supervisorType,
-                        forDaySalary: salary.supervisorId.forDaySalary
+                        perDaySalary: salary.supervisorId.perDaySalary
                     }
                 }))
             });
@@ -871,7 +871,7 @@ export const getSalaryReport = async (req, res) => {
         const salaries = await SupervisorSalary.find(query)
             .populate({
                 path: 'supervisorId',
-                select: 'name email phone supervisorType forDaySalary',
+                select: 'name email phone supervisorType perDaySalary',
                 model: 'Supervisor',
                 options: { allowNull: true }
             })
@@ -936,7 +936,7 @@ export const generateDailyReport = async (req, res) => {
         }
 
         const salaries = await SupervisorSalary.find({ date })
-            .populate('supervisorId', 'name supervisorType forDaySalary')
+            .populate('supervisorId', 'name supervisorType perDaySalary')
             .sort({ 'supervisorId.name': 1 });
 
         if (format === 'json') {
@@ -967,7 +967,7 @@ export const generateDailyReport = async (req, res) => {
                     _id: salary._id,
                     name: salary.supervisorId.name,
                     type: salary.supervisorId.supervisorType,
-                    basic: salary.forDaySalary,
+                    basic: salary.perDaySalary,
                     net: salary.netWeeklySalary,
                     status: salary.status
                 });
@@ -1009,7 +1009,7 @@ export const generateDailyReport = async (req, res) => {
             
             salaries.forEach((salary, index) => {
                 doc.text(`${index + 1}. ${salary.supervisorId.name} (${salary.supervisorId.supervisorType})`);
-                doc.text(`   Basic: ₹${salary.forDaySalary.toFixed(2)} | Net: ₹${salary.netWeeklySalary.toFixed(2)} | Status: ${salary.status}`);
+                doc.text(`   Basic: ₹${salary.perDaySalary.toFixed(2)} | Net: ₹${salary.netWeeklySalary.toFixed(2)} | Status: ${salary.status}`);
                 doc.moveDown(0.5);
             });
             
@@ -1072,7 +1072,7 @@ export const generateMonthlyReport = async (req, res) => {
                     _id: salary._id,
                     name: salary.supervisorId.name,
                     type: salary.supervisorId.supervisorType,
-                    basic: salary.forDaySalary,
+                    basic: salary.perDaySalary,
                     allowances: salary.allowances,
                     deductions: salary.deductions,
                     advance: salary.advanceSalary,
@@ -1135,7 +1135,7 @@ export const generateMonthlyReport = async (req, res) => {
             let totalNet = 0;
             salaries.forEach((salary, index) => {
                 doc.text(`${index + 1}. ${salary.supervisorId.name} (${salary.supervisorId.supervisorType})`);
-                doc.text(`   Basic: ₹${salary.forDaySalary.toFixed(2)} | Allowances: ₹${salary.allowances.toFixed(2)}`);
+                doc.text(`   Basic: ₹${salary.perDaySalary.toFixed(2)} | Allowances: ₹${salary.allowances.toFixed(2)}`);
                 doc.text(`   Deductions: ₹${salary.deductions.toFixed(2)} | Advance: ₹${salary.advanceSalary.toFixed(2)}`);
                 doc.text(`   Net Salary: ₹${salary.netWeeklySalary.toFixed(2)} | Status: ${salary.status}`);
                 doc.moveDown(0.5);
@@ -1201,7 +1201,7 @@ export const generateYearlyReport = async (req, res) => {
                     name: salary.supervisorId.name,
                     type: salary.supervisorId.supervisorType,
                     month: salary.monthName,
-                    basic: salary.forDaySalary,
+                    basic: salary.perDaySalary,
                     net: salary.netWeeklySalary,
                     status: salary.status
                 });
@@ -1322,7 +1322,7 @@ const generateExcelSalaryReport = async (res, salaries, title = 'Salary Report')
                 name: salary.supervisorId?.name || salary.supervisorName || 'Unknown',
                 month: salary.monthName,
                 year: salary.year,
-                basicSalary: salary.forDaySalary || salary.basicSalary,
+                basicSalary: salary.perDaySalary || salary.basicSalary,
                 allowances: salary.allowances,
                 deductions: salary.deductions,
                 netSalary: salary.netWeeklySalary,
@@ -1435,7 +1435,7 @@ const generatePdfSalaryReport = async (res, salaries, title = 'Salary Report') =
                 salary.supervisorId?.name || salary.supervisorName || 'Unknown',
                 salary.monthName,
                 salary.year.toString(),
-                `₹${(salary.forDaySalary || salary.basicSalary).toFixed(2)}`,
+                `₹${(salary.perDaySalary || salary.basicSalary).toFixed(2)}`,
                 `₹${salary.allowances.toFixed(2)}`,
                 `₹${salary.deductions.toFixed(2)}`,
                 `₹${salary.netWeeklySalary.toFixed(2)}`,
@@ -1449,7 +1449,7 @@ const generatePdfSalaryReport = async (res, salaries, title = 'Salary Report') =
 
         // Calculate totals for footer
         const totals = {
-            basicSalary: salaries.reduce((sum, s) => sum + (s.forDaySalary || s.basicSalary), 0),
+            basicSalary: salaries.reduce((sum, s) => sum + (s.perDaySalary || s.basicSalary), 0),
             allowances: salaries.reduce((sum, s) => sum + s.allowances, 0),
             deductions: salaries.reduce((sum, s) => sum + s.deductions, 0),
             netSalary: salaries.reduce((sum, s) => sum + s.netWeeklySalary, 0),
