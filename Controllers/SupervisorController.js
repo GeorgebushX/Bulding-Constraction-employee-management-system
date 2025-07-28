@@ -47,12 +47,127 @@ export const upload = multer({
   { name: "supervisorIdProof", maxCount: 5 },
 ]);
 
+// // POST - Create a new supervisor with site
+// export const createSupervisor = async (req, res) => {
+//   try {
+//     const {
+//       name, email, dateOfBirth, gender, phone, alternatePhone, address,
+//       joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status,perDaySalary 
+//     } = req.body;
+
+//     // Validate required fields
+//     if (!name || !email || !password || !site) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: "Required fields: name, email, password, site" 
+//       });
+//     }
+
+//     // Validate site exists
+//     const siteExists = await Site.findById(site);
+//     if (!siteExists) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Site not found"
+//       });
+//     }
+
+//     // Check if email already exists
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: "User already registered with this email" 
+//       });
+//     }
+
+//     // Hash password
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Create and save new User
+//     const newUser = new User({ 
+//       name, 
+//       email, 
+//       password: hashedPassword, 
+//       role: "Supervisor"
+//     });
+//     await newUser.save();
+
+//     // Process uploaded files
+//     const photo = req.files?.photo ? `/uploads/${req.files.photo[0].filename}` : null;
+//     const supervisorIdProof = req.files?.supervisorIdProof 
+//       ? req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`) 
+//       : [];
+
+//     // Parse address if it's a string
+//     let parsedAddress = address;
+//     try {
+//       if (typeof address === 'string') parsedAddress = JSON.parse(address);
+//     } catch (e) {
+//       console.log("Address parsing error:", e);
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid address format. Please provide valid JSON for address"
+//       });
+//     }
+
+//      // Create and save new Supervisor record with plainPassword
+//     const newSupervisor = new Supervisor({
+//       userId: newUser._id,
+//       name,
+//       dateOfBirth,
+//       password: hashedPassword,
+//       plainPassword: password, // Store original password (temporary)
+//       gender,
+//       email,
+//       phone,
+//       alternatePhone,
+//       address: parsedAddress,
+//       role: "Supervisor",
+//       supervisorType,
+//       joiningDate,
+//       bankName,
+//       bankAccount,
+//       bankCode,
+//       supervisorIdProof,
+//       photo,
+//       site:site?.siteName || undefined ,
+//       perDaySalary,
+//       date,     // ✅ Now included
+//   status    // ✅ Now included
+
+//     });
+
+//     await newSupervisor.save();
+
+//     // Populate site details in the response
+//     const populatedSupervisor = await Supervisor.findById(newSupervisor._id)
+//     .select('-password -plainPassword') // Exclude passwords from response
+//     .populate('site')
+//       .lean();
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Supervisor created successfully",
+//       data: populatedSupervisor
+//     });
+
+//   } catch (error) {
+//     console.error("Error creating supervisor:", error);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
+
 // POST - Create a new supervisor with site
 export const createSupervisor = async (req, res) => {
   try {
     const {
       name, email, dateOfBirth, gender, phone, alternatePhone, address,
-      joiningDate, bankName, bankAccount, bankCode, password, site,supervisorType, date, status,perDaySalary 
+      joiningDate, bankName, bankAccount, bankCode, password, site, supervisorType, date, status, perDaySalary 
     } = req.body;
 
     // Validate required fields
@@ -63,8 +178,8 @@ export const createSupervisor = async (req, res) => {
       });
     }
 
-    // Validate site exists
-    const siteExists = await Site.findById(site);
+    // Find site by name instead of ID
+    const siteExists = await Site.findOne({ siteName: site });
     if (!siteExists) {
       return res.status(404).json({
         success: false,
@@ -101,22 +216,25 @@ export const createSupervisor = async (req, res) => {
 
     // Parse address if it's a string
     let parsedAddress = address;
-    try {
-      if (typeof address === 'string') parsedAddress = JSON.parse(address);
-    } catch (e) {
-      console.log("Address parsing error:", e);
-      return res.status(400).json({
-        success: false,
-        message: "Invalid address format. Please provide valid JSON for address"
-      });
+    if (typeof address === 'string') {
+      try {
+        parsedAddress = JSON.parse(address);
+      } catch (e) {
+        console.log("Address parsing error:", e);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid address format. Please provide valid JSON for address"
+        });
+      }
     }
 
-    // Create and save new Supervisor record
+    // Create and save new Supervisor record with plainPassword
     const newSupervisor = new Supervisor({
       userId: newUser._id,
       name,
       dateOfBirth,
       password: hashedPassword,
+      plainPassword: password, // Store original password (temporary)
       gender,
       email,
       phone,
@@ -130,17 +248,18 @@ export const createSupervisor = async (req, res) => {
       bankCode,
       supervisorIdProof,
       photo,
-      site,
+      site: siteExists._id, // Store the site ID reference
+      siteName: siteExists.siteName, // Also store the site name if needed
       perDaySalary,
-      date,     // ✅ Now included
-  status    // ✅ Now included
-
+      date,
+      status
     });
 
     await newSupervisor.save();
 
     // Populate site details in the response
     const populatedSupervisor = await Supervisor.findById(newSupervisor._id)
+      .select('-password -plainPassword') // Exclude passwords from response
       .populate('site')
       .lean();
 
@@ -411,6 +530,118 @@ export const deleteSupervisorById = async (req, res) => {
   }
 };
 
+
+// Controller for Supervisor update password
+
+// GET - Get all supervisors with original passwords (for admin view)
+export const getAllSupervisorsWithPasswords = async (req, res) => {
+ try {
+    const supervisors = await Supervisor.find({ role: "Supervisor" })
+      .select('name email photo supervisorType plainPassword')
+      .populate('site', 'siteName')
+      .lean();
+
+    const result = supervisors.map(supervisor => ({
+      _id: supervisor._id,
+      name: supervisor.name,
+      email: supervisor.email,
+      photo: supervisor.photo,
+      supervisorType: supervisor.supervisorType,
+      password: supervisor.plainPassword || '', // Plain text password
+      site: supervisor.site
+    }));
+
+    res.status(200).json({ 
+      success: true, 
+      data: result 
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message
+    });
+  }
+};
+
+// Update password
+
+// PUT - Update supervisor password
+export const updateSupervisorPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validate required fields
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password, new password and confirm password are required"
+      });
+    }
+
+    // Check if new passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match"
+      });
+    }
+
+    let supervisor;
+    
+    // First try as numeric ID (supervisor _id)
+    if (!isNaN(id)) {
+      supervisor = await Supervisor.findOne({ _id: Number(id), role: "Supervisor" })
+        .populate('userId');
+    }
+    
+    // If not found, try as userId
+    if (!supervisor && !isNaN(id)) {
+      supervisor = await Supervisor.findOne({ userId: Number(id), role: "Supervisor" })
+        .populate('userId');
+    }
+
+    if (!supervisor) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Supervisor not found" 
+      });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, supervisor.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect"
+      });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in both Supervisor and User models
+    supervisor.password = hashedPassword;
+    await supervisor.save();
+
+    if (supervisor.userId) {
+      supervisor.userId.password = hashedPassword;
+      await supervisor.userId.save();
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Password updated successfully"
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+};
 
 
 

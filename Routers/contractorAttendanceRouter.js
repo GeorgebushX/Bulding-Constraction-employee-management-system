@@ -21,7 +21,7 @@ const router = express.Router();
 // Attendance routes
 router.get("/yes/contractors/attendance", authMiddleware, getContractorAttendance);
 router.put("/yes/contractors/attendance/:id",authMiddleware,updateContractorAttendance);
-router.put("/contractors/attendance/bulk-by-date",authMiddleware,bulkUpdateContractorAttendanceByDate);
+router.put("/contractors/attendance",authMiddleware,bulkUpdateContractorAttendanceByDate);
 router.get("/contractors/attendance/:day/:month/:year",authMiddleware,getContractorAttendanceByDate);
 router.put("/contractors/attendance/bulk-by-status",authMiddleware,bulkUpdateContractorAttendanceStatus);
 router.get('/contractors/attendance/reports',authMiddleware, getBulkDataReport);

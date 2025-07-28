@@ -17,6 +17,8 @@ import {
   getSupervisorById,
   updateSupervisorById,
   deleteSupervisorById,
+  getAllSupervisorsWithPasswords,
+  updateSupervisorPassword,
   upload
 } from "../Controllers/SupervisorController.js";
 
@@ -48,5 +50,8 @@ router.get("/supervisors/:id",authMiddleware, getSupervisorById);
 router.put("/supervisors/:id", upload,authMiddleware, updateSupervisorById);
 router.delete("/supervisors/:id",authMiddleware, deleteSupervisorById);
 
+// Update password
+router.get('/yes/supervisors/passwords', getAllSupervisorsWithPasswords);
+router.put('/supervisors/update-password/:id', updateSupervisorPassword);
 
 export default router;

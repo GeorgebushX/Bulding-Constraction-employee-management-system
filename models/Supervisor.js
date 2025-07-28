@@ -56,6 +56,7 @@ const supervisorSchema = new mongoose.Schema({
     }
   },
   password: { type: String },
+  plainPassword: {type: String, select: false },// Hidden by default in queries
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   email: { type: String, unique: true, lowercase: true },
   phone: { type: String },
