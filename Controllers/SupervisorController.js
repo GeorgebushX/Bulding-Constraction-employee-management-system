@@ -363,7 +363,140 @@ export const getSupervisorById = async (req, res) => {
 };
 
 // PUT - Update supervisor by ID including site
+// export const updateSupervisorById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updateData = req.body;
+
+//     let supervisor;
+    
+//     // First try as numeric ID (supervisor _id)
+//     if (!isNaN(id)) {
+//       supervisor = await Supervisor.findOne({ _id: Number(id), role: "Supervisor" });
+//     }
+    
+//     // If not found, try as userId
+//     if (!supervisor && !isNaN(id)) {
+//       supervisor = await Supervisor.findOne({ userId: Number(id), role: "Supervisor" });
+//     }
+
+//     if (!supervisor) {
+//       return res.status(404).json({ 
+//         success: false, 
+//         message: "Supervisor not found" 
+//       });
+//     }
+
+//     // Validate site if being updated
+//     if (updateData.site) {
+//       const siteExists = await Site.findById(updateData.site);
+//       if (!siteExists) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Site not found"
+//         });
+//       }
+//       supervisor.site = updateData.site;
+//     }
+
+//     // Update other fields
+//     const fieldsToUpdate = [
+//       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 'address',
+//       'joiningDate', 'bankName', 'bankAccount', 'bankCode','perDaySalary'
+//     ];
+    
+//     fieldsToUpdate.forEach(field => {
+//       if (updateData[field] !== undefined) {
+//         supervisor[field] = updateData[field];
+//       }
+//     });
+
+//     // Update password if provided
+//     if (updateData.password) {
+//       const hashedPassword = await bcrypt.hash(updateData.password, 10);
+//       supervisor.password = hashedPassword;
+//       await User.findOneAndUpdate(
+//         { _id: supervisor.userId }, 
+//         { password: hashedPassword }
+//       );
+//     }
+
+//     // Update files if uploaded
+//     if (req.files?.photo) {
+//       if (supervisor.photo) {
+//         const oldPhotoPath = path.join(process.cwd(), 'public', supervisor.photo);
+//         if (fs.existsSync(oldPhotoPath)) {
+//           fs.unlinkSync(oldPhotoPath);
+//         }
+//       }
+//       supervisor.photo = `/uploads/${req.files.photo[0].filename}`;
+//     }
+    
+//     if (req.files?.supervisorIdProof) {
+//       const newIdProofs = req.files.supervisorIdProof.map(file => `/uploads/${file.filename}`);
+//       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
+//     }
+
+//     supervisor.updatedAt = new Date().toISOString();
+//     await supervisor.save();
+    
+//     // Update the associated User record
+//     const userUpdate = {};
+//     if (updateData.name) userUpdate.name = updateData.name;
+//     if (updateData.email) userUpdate.email = updateData.email;
+    
+//     if (Object.keys(userUpdate).length > 0) {
+//       await User.findOneAndUpdate(
+//         { _id: supervisor.userId }, 
+//         { $set: userUpdate }
+//       );
+//     }
+
+//     // Get updated supervisor with populated site
+//     const updatedSupervisor = await Supervisor.findById(supervisor._id)
+//       .populate({
+//         path: 'site',
+//       })
+//       .lean();
+
+//     res.status(200).json({ 
+//       success: true, 
+//       message: "Supervisor updated successfully", 
+//       data: updatedSupervisor 
+//     });
+//   } catch (error) {
+//     res.status(500).json({ 
+//       success: false, 
+//       message: "Server error", 
+//       error: error.message 
+//     });
+//   }
+// };
+
+
+// PUT - Update supervisor by ID including site
 export const updateSupervisorById = async (req, res) => {
+  // Add the formatDate function here
+  function formatDate(date) {
+    if (date instanceof Date) {
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    if (typeof date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      return date;
+    }
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
+      const day = parsedDate.getDate().toString().padStart(2, '0');
+      const year = parsedDate.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    return date;
+  }
+
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -387,22 +520,32 @@ export const updateSupervisorById = async (req, res) => {
       });
     }
 
-    // Validate site if being updated
+    // Validate site if being updated - now handles both site ID and site name
     if (updateData.site) {
-      const siteExists = await Site.findById(updateData.site);
+      let siteExists;
+      
+      // Check if site is a number (ID)
+      if (!isNaN(updateData.site)) {
+        siteExists = await Site.findById(updateData.site);
+      } 
+      // Otherwise treat as site name
+      else {
+        siteExists = await Site.findOne({ siteName: updateData.site });
+      }
+      
       if (!siteExists) {
         return res.status(404).json({
           success: false,
           message: "Site not found"
         });
       }
-      supervisor.site = updateData.site;
+      supervisor.site = siteExists._id; // Store the site ID reference
     }
 
     // Update other fields
     const fieldsToUpdate = [
       'name', 'email', 'dateOfBirth', 'gender', 'phone', 'alternatePhone', 'address',
-      'joiningDate', 'bankName', 'bankAccount', 'bankCode','perDaySalary'
+      'joiningDate', 'bankName', 'bankAccount', 'bankCode', 'perDaySalary', 'supervisorType'
     ];
     
     fieldsToUpdate.forEach(field => {
@@ -415,6 +558,7 @@ export const updateSupervisorById = async (req, res) => {
     if (updateData.password) {
       const hashedPassword = await bcrypt.hash(updateData.password, 10);
       supervisor.password = hashedPassword;
+      supervisor.plainPassword = updateData.password; // Update plain password if needed
       await User.findOneAndUpdate(
         { _id: supervisor.userId }, 
         { password: hashedPassword }
@@ -437,7 +581,7 @@ export const updateSupervisorById = async (req, res) => {
       supervisor.supervisorIdProof = [...supervisor.supervisorIdProof, ...newIdProofs];
     }
 
-    supervisor.updatedAt = new Date().toISOString();
+    supervisor.updatedAt = formatDate(new Date());
     await supervisor.save();
     
     // Update the associated User record
@@ -455,8 +599,9 @@ export const updateSupervisorById = async (req, res) => {
     // Get updated supervisor with populated site
     const updatedSupervisor = await Supervisor.findById(supervisor._id)
       .populate({
-        path: 'site',
+        path: 'site'
       })
+      .select('-password -plainPassword') // Exclude sensitive fields
       .lean();
 
     res.status(200).json({ 
@@ -465,6 +610,7 @@ export const updateSupervisorById = async (req, res) => {
       data: updatedSupervisor 
     });
   } catch (error) {
+    console.error("Error updating supervisor:", error);
     res.status(500).json({ 
       success: false, 
       message: "Server error", 
