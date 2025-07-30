@@ -57,35 +57,92 @@ export const upload = multer({
 ]);
 
 // GET - Get supervisors by contractor role
+// export const getSupervisorsByContractorRole = async (req, res) => {
+//   try {
+//     const { contractorRole } = req.params;
+    
+//     if (!ROLE_MAPPING[contractorRole]) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid contractor role"
+//       });
+//     }
+    
+//     const supervisorType = ROLE_MAPPING[contractorRole];
+//     const supervisors = await Supervisor.find({ 
+//       supervisorType,
+//       site: req.query.siteName // optional siteName filter
+//     }).select('_id name email phone site').populate('site', 'name');
+    
+//     res.status(200).json({
+//       success: true,
+//       data: supervisors
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: error.message
+//     });
+//   }
+// };
+
+// GET - Get supervisors by contractor role
 export const getSupervisorsByContractorRole = async (req, res) => {
   try {
     const { contractorRole } = req.params;
     
+    // Log the incoming request
+    console.log(`Request received for contractor role: ${contractorRole}, site filter: ${req.query.siteName || 'none'}`);
+    
     if (!ROLE_MAPPING[contractorRole]) {
       return res.status(400).json({
         success: false,
-        message: "Invalid contractor role"
+        message: "Invalid contractor role",
+        validRoles: Object.keys(ROLE_MAPPING)
       });
     }
     
     const supervisorType = ROLE_MAPPING[contractorRole];
-    const supervisors = await Supervisor.find({ 
-      supervisorType,
-      site: req.query.siteName // optional siteName filter
-    }).select('_id name email phone site').populate('site', 'name');
+    
+    // Build query
+    const query = { supervisorType };
+    if (req.query.siteName) {
+      query.site = req.query.siteName;
+    }
+    
+    console.log(`Querying supervisors with:`, query);
+    
+    const supervisors = await Supervisor.find(query)
+      .select('_id name email phone supervisorType site')
+      .populate('site', 'name');
+    
+    console.log(`Found ${supervisors.length} supervisors`);
+    
+    if (supervisors.length === 0) {
+      return res.status(404).json({
+        success: true,
+        message: "No supervisors found for this role",
+        data: [],
+        suggestion: "Check if any supervisors exist with type: " + supervisorType
+      });
+    }
     
     res.status(200).json({
       success: true,
       data: supervisors
     });
   } catch (error) {
+    console.error("Error in getSupervisorsByContractorRole:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
+
 
 // POST - Create a new Contractor with supervisorName (site derived from supervisor)
 export const createContractor = async (req, res) => {
