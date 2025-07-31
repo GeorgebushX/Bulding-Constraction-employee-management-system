@@ -27,6 +27,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true },
   password: { type: String, required: true },
   role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
+  roleType: { type: String }, // Unifying role-specific info
   photo: { type: String },
   createdAt: { type: String },
   updatedAt: { type: String }
