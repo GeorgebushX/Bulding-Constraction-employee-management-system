@@ -112,6 +112,71 @@ export const getContractorAttendance =  async (req, res) => {
   };
 
   // Update single contractor attendance
+// export const updateContractorAttendance = async (req, res) => {
+//     try {
+//       const { id } = req.params;
+//       const { status } = req.body;
+//       const currentDate = formatCurrentDate();
+
+//       // Convert id to number and validate
+//       const contractorId = Number(id);
+//       if (isNaN(contractorId)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid contractor ID",
+//         });
+//       }
+
+//       const validStatuses = ["Fullday", "Halfday", "Overtime", null];
+//       if (!validStatuses.includes(status)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid attendance status",
+//         });
+//       }
+
+//       const updatedContractor = await Contractor.findOneAndUpdate(
+//         { _id: contractorId },
+//         {
+//           $set: {
+//             "currentAttendance.date": currentDate,
+//             "currentAttendance.status": status,
+//           },
+//           $push: status ? {
+//             attendanceRecords: {
+//               currentAttendance: {
+//                 date: currentDate,
+//                 status: status,
+//               },
+//             },
+//           } : undefined,
+//         },
+//         { new: true }
+//       ).select("_id name photo currentAttendance");
+
+//       if (!updatedContractor) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Contractor not found",
+//         });
+//       }
+
+//       return res.status(200).json({
+//         success: true,
+//         data: updatedContractor,
+//         message: "Attendance updated successfully",
+//       });
+//     } catch (error) {
+//       console.error("Error updating contractor attendance:", error);
+//       return res.status(500).json({
+//         success: false,
+//         message: "Internal Server Error",
+//         error: error.message,
+//       });
+//     }
+// };
+
+// Update single contractor attendance
 export const updateContractorAttendance = async (req, res) => {
     try {
       const { id } = req.params;
@@ -135,22 +200,29 @@ export const updateContractorAttendance = async (req, res) => {
         });
       }
 
+      // Prepare the update object
+      const updateObj = {
+        $set: {
+          "currentAttendance.date": currentDate,
+          "currentAttendance.status": status,
+        }
+      };
+
+      // Only add $push if status is not null
+      if (status !== null) {
+        updateObj.$push = {
+          attendanceRecords: {
+            currentAttendance: {
+              date: currentDate,
+              status: status,
+            },
+          },
+        };
+      }
+
       const updatedContractor = await Contractor.findOneAndUpdate(
         { _id: contractorId },
-        {
-          $set: {
-            "currentAttendance.date": currentDate,
-            "currentAttendance.status": status,
-          },
-          $push: status ? {
-            attendanceRecords: {
-              currentAttendance: {
-                date: currentDate,
-                status: status,
-              },
-            },
-          } : undefined,
-        },
+        updateObj,
         { new: true }
       ).select("_id name photo currentAttendance");
 

@@ -37,6 +37,8 @@ import supervisorSalary from "./Routers/supervisorSalaryRouter.js"
 import changePassword from "./Routers/settings.js"
 
 import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
+// workers
+import WorkersDetails from "./Routers/WorkerRouter.js"
 // connect to the database
 connectDatabase();
 
@@ -73,6 +75,7 @@ app.use("/api",supervisorSalary)
 app.use("/api",changePassword)
 app.use("/api",contractorAttendance)
 app.use("/api",ContractorSalaries)
+app.use("/api",WorkersDetails)
 // start the server
 const PORT = process.env.PORT || 3002;
 

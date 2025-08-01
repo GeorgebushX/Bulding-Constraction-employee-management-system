@@ -234,7 +234,8 @@
     }
   }, {
     timestamps: false,
-    _id: false
+    _id: false,
+    strictPopulate: false // <-- ✅ Add this line
   });
 
   // 🔧 Date formatter for custom fields

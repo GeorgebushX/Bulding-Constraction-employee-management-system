@@ -91,7 +91,7 @@ const contractorSalarySchema = new mongoose.Schema({
     },
     date: {
         type: String,
-    },
+    },          
     totalDays: {
         type: Number,
         min: 1,
