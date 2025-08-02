@@ -92,7 +92,7 @@ const getContractorByNameAndRole = async (contractorName, workerRole) => {
   });
 };
 
-// GET - Get all workers
+// // GET - Get all workers
 // export const getAllWorkers = async (req, res) => {
 //   try {
 //     const { search = '', site, contractor, role } = req.query;
@@ -146,15 +146,14 @@ const getContractorByNameAndRole = async (contractorName, workerRole) => {
 // };
 
 // GET - Get all workers
-// GET - Get all workers with populated data
 export const getAllWorkers = async (req, res) => {
   try {
     const { search = '', site, contractor, role } = req.query;
 
-    // Base query to only get workers
+    // Start with a base query that only looks for workers
     const query = { role: "Worker" };
     
-    // Search functionality
+    // Add search criteria if provided
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -163,103 +162,84 @@ export const getAllWorkers = async (req, res) => {
       ];
     }
     
-    // Filter by site
+    // Add site filter if provided
     if (site) {
-      query.site = mongoose.Types.ObjectId.isValid(site) ? site : null;
+      if (mongoose.Types.ObjectId.isValid(site)) {
+        query.site = new mongoose.Types.ObjectId(site);
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid site ID format"
+        });
+      }
     }
     
-    // Filter by contractor
+    // Add contractor filter if provided
     if (contractor) {
       const contractorDoc = await Contractor.findOne({ 
-        name: { $regex: new RegExp(contractor, 'i') }
+        $or: [
+          { name: contractor },
+          { _id: mongoose.Types.ObjectId.isValid(contractor) ? new mongoose.Types.ObjectId(contractor) : null }
+        ]
       });
+      
       if (contractorDoc) {
         query.contractorId = contractorDoc._id;
       } else {
-        return res.status(200).json({
-          success: true,
-          message: "No workers found for the specified contractor",
-          data: []
+        return res.status(404).json({
+          success: false,
+          message: "Contractor not found"
         });
       }
     }
 
-    // Filter by role
+    // Add role filter if provided
     if (role) {
-      query.workerRole = role;
+      if (Object.keys(WORKER_ROLE_MAPPING).includes(role)) {
+        query.workerRole = role;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid worker role. Valid roles are: ${Object.keys(WORKER_ROLE_MAPPING).join(', ')}`
+        });
+      }
     }
 
-    // Get workers with populated data
+    console.log("Final query:", query); // Debugging log
+
     const workers = await Worker.find(query)
       .populate({
         path: 'site',
-        select: 'name _id',
-        model: 'Site'
+        select: 'name'
       })
       .populate({
         path: 'contractorId',
-        select: 'name contractorRole _id',
-        model: 'Contractor'
+        select: 'name contractorRole'
       })
-      .sort({ createdAt: -1 }) // Sort by newest first
       .lean();
 
-    // Format the response data
-    const formattedWorkers = workers.map(worker => {
-      const workerData = {
-        _id: worker._id,
-        name: worker.name,
-        email: worker.email,
-        phone: worker.phone,
-        gender: worker.gender,
-        workerRole: worker.workerRole,
-        workerSubRole: worker.workerSubRole,
-        perDaySalary: worker.perDaySalary,
-        status: worker.status || 'active',
-        createdAt: worker.createdAt,
-        updatedAt: worker.updatedAt
-      };
+    console.log("Found workers:", workers.length); // Debugging log
 
-      // Add contractor data if exists
-      if (worker.contractorId) {
-        workerData.contractor = {
-          _id: worker.contractorId._id,
-          name: worker.contractorId.name,
-          role: worker.contractorId.contractorRole
-        };
-      }
-
-      // Add site data if exists
-      if (worker.site) {
-        workerData.site = {
-          _id: worker.site._id,
-          name: worker.site.name
-        };
-      }
-
-      return workerData;
-    });
-
-    if (formattedWorkers.length === 0) {
-      return res.status(200).json({
+    if (workers.length === 0) {
+      return res.status(404).json({
         success: true,
-        message: "No workers found matching your criteria",
+        message: "No workers found matching the criteria",
         data: []
       });
     }
 
     res.status(200).json({ 
       success: true, 
-      count: formattedWorkers.length,
-      data: formattedWorkers
+      data: workers,
+      count: workers.length
     });
-
   } catch (error) {
-    console.error("Error fetching workers:", error);
+    console.error("Error in getAllWorkers:", error); // Detailed error logging
     res.status(500).json({ 
       success: false, 
-      message: "Failed to fetch workers", 
-      error: error.message 
+      message: "Server Error", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };

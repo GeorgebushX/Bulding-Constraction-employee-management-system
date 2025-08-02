@@ -342,7 +342,7 @@ export const getAllSalaries = async (req, res) => {
                 options: { allowNull: true }
             })
             // .populate('site')
-            // .populate('supervisorId')
+            .populate('supervisorId')
             .sort({ date: -1, _id: 1 })
             .lean();    
 

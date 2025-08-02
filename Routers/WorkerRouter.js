@@ -26,15 +26,15 @@ router.get('/workers/contractors/:workerRole', getContractorsByWorkerRole);
 router.get('/workers/subroles/:workerRole', getSubRoles);
 
 // Get worker by ID
-router.get('/workers/:id', getWorkerById);
+router.get('/yes/workers/:id', getWorkerById);
 
 // Create new worker
 router.post('/yes/workers', upload, createWorker);
 
 // Update worker by ID
-router.put('/workers/:id', upload, updateWorkerById);
+router.put('/yes/workers/:id', upload, updateWorkerById);
 
 // Delete worker by ID
-router.delete('/workers/:id', deleteWorkerById);
+router.delete('/yes/workers/:id', deleteWorkerById);
 
 export default router;
