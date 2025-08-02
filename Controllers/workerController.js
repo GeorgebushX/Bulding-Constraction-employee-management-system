@@ -93,12 +93,68 @@ const getContractorByNameAndRole = async (contractorName, workerRole) => {
 };
 
 // GET - Get all workers
+// export const getAllWorkers = async (req, res) => {
+//   try {
+//     const { search = '', site, contractor, role } = req.query;
+
+//     const query = { role: "Worker" };
+    
+//     if (search) {
+//       query.$or = [
+//         { name: { $regex: search, $options: 'i' } },
+//         { email: { $regex: search, $options: 'i' } },
+//         { phone: { $regex: search, $options: 'i' } }
+//       ];
+//     }
+    
+//     if (site) {
+//       query.site = site;
+//     }
+    
+//     if (contractor) {
+//       const contractorDoc = await Contractor.findOne({ name: contractor });
+//       if (contractorDoc) {
+//         query.contractorId = contractorDoc._id;
+//       } else {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Contractor not found"
+//         });
+//       }
+//     }
+
+//     if (role) {
+//       query.workerRole = role;
+//     }
+
+//     const workers = await Worker.find(query)
+//       .populate('site', 'name')
+//       .populate('contractorId', 'name contractorRole')
+//       .lean();
+
+//     res.status(200).json({ 
+//       success: true, 
+//       data: workers
+//     });
+//   } catch (error) {
+//     res.status(500).json({ 
+//       success: false, 
+//       message: "Server Error", 
+//       error: error.message 
+//     });
+//   }
+// };
+
+// GET - Get all workers
+// GET - Get all workers with populated data
 export const getAllWorkers = async (req, res) => {
   try {
     const { search = '', site, contractor, role } = req.query;
 
+    // Base query to only get workers
     const query = { role: "Worker" };
     
+    // Search functionality
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -107,39 +163,102 @@ export const getAllWorkers = async (req, res) => {
       ];
     }
     
+    // Filter by site
     if (site) {
-      query.site = site;
+      query.site = mongoose.Types.ObjectId.isValid(site) ? site : null;
     }
     
+    // Filter by contractor
     if (contractor) {
-      const contractorDoc = await Contractor.findOne({ name: contractor });
+      const contractorDoc = await Contractor.findOne({ 
+        name: { $regex: new RegExp(contractor, 'i') }
+      });
       if (contractorDoc) {
         query.contractorId = contractorDoc._id;
       } else {
-        return res.status(404).json({
-          success: false,
-          message: "Contractor not found"
+        return res.status(200).json({
+          success: true,
+          message: "No workers found for the specified contractor",
+          data: []
         });
       }
     }
 
+    // Filter by role
     if (role) {
       query.workerRole = role;
     }
 
+    // Get workers with populated data
     const workers = await Worker.find(query)
-      .populate('site', 'name')
-      .populate('contractorId', 'name contractorRole')
+      .populate({
+        path: 'site',
+        select: 'name _id',
+        model: 'Site'
+      })
+      .populate({
+        path: 'contractorId',
+        select: 'name contractorRole _id',
+        model: 'Contractor'
+      })
+      .sort({ createdAt: -1 }) // Sort by newest first
       .lean();
+
+    // Format the response data
+    const formattedWorkers = workers.map(worker => {
+      const workerData = {
+        _id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        gender: worker.gender,
+        workerRole: worker.workerRole,
+        workerSubRole: worker.workerSubRole,
+        perDaySalary: worker.perDaySalary,
+        status: worker.status || 'active',
+        createdAt: worker.createdAt,
+        updatedAt: worker.updatedAt
+      };
+
+      // Add contractor data if exists
+      if (worker.contractorId) {
+        workerData.contractor = {
+          _id: worker.contractorId._id,
+          name: worker.contractorId.name,
+          role: worker.contractorId.contractorRole
+        };
+      }
+
+      // Add site data if exists
+      if (worker.site) {
+        workerData.site = {
+          _id: worker.site._id,
+          name: worker.site.name
+        };
+      }
+
+      return workerData;
+    });
+
+    if (formattedWorkers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No workers found matching your criteria",
+        data: []
+      });
+    }
 
     res.status(200).json({ 
       success: true, 
-      data: workers
+      count: formattedWorkers.length,
+      data: formattedWorkers
     });
+
   } catch (error) {
+    console.error("Error fetching workers:", error);
     res.status(500).json({ 
       success: false, 
-      message: "Server Error", 
+      message: "Failed to fetch workers", 
       error: error.message 
     });
   }
@@ -318,6 +437,7 @@ export const getWorkerById = async (req, res) => {
   }
 };
 
+
 // POST - Create a new worker
 export const createWorker = async (req, res) => {
   try {
@@ -345,12 +465,15 @@ export const createWorker = async (req, res) => {
     }
 
     // Find contractor by name and role
-    const contractor = await getContractorByNameAndRole(contractorName, workerRole);
+    const contractor = await Contractor.findOne({ 
+      name: contractorName,
+      contractorRole: ROLE_MAPPING[workerRole]
+    });
+
     if (!contractor) {
-      const contractorRole = ROLE_MAPPING[workerRole];
       return res.status(404).json({
         success: false,
-        message: `Contractor not found with name '${contractorName}' and role '${contractorRole}'`
+        message: `Contractor not found with name '${contractorName}' and role '${ROLE_MAPPING[workerRole]}'`
       });
     }
 
@@ -381,18 +504,6 @@ export const createWorker = async (req, res) => {
       ? req.files.workersIdProof.map(file => `/uploads/${file.filename}`) 
       : [];
 
-    // Parse address if it's a string
-    let parsedAddress = address;
-    try {
-      if (typeof address === 'string') parsedAddress = JSON.parse(address);
-    } catch (e) {
-      console.log("Address parsing error:", e);
-      return res.status(400).json({
-        success: false,
-        message: "Invalid address format. Please provide valid JSON for address"
-      });
-    }
-
     // Create and save new Worker record
     const newWorker = new Worker({
       userId: newUser._id,
@@ -404,46 +515,37 @@ export const createWorker = async (req, res) => {
       email,
       phone,
       alternatePhone,
-      address: parsedAddress,
+      address: typeof address === 'string' ? JSON.parse(address) : address,
       role: "Worker",
       workerRole,
-      ...(workerSubRole && { [workerRole.toLowerCase().replace(' ', '') + 'SubRole']: workerSubRole }),
+      workerSubRole,
       joiningDate,
       bankName,
       bankAccount,
       bankCode,
-      workersIdProof,
+      workerIdProof: workersIdProof,
       photo,
       perDaySalary
     });
 
     await newWorker.save();
 
-    // // Populate site and contractor details in the response
-    // const populatedWorker = await Worker.findById(newWorker._id)
-    //   .populate('site')
-    //   .populate('contractorId', 'name contractorRole')
-    //   .lean();
-
-
-    // Then populate the fields when querying for the response
-const populatedWorker = await Worker.findOne({ _id: newWorker._id })
-  .populate({
-    path: 'contractorId',
-    select: 'name contractorRole',
-    model: 'Contractor'
-  })
-  .populate({
-    path: 'site',
-    select: 'name',
-    model: 'Site'
-  })
-  .lean();
+    // Get the populated worker data without triggering population errors
+    const result = await Worker.findOne({ _id: newWorker._id }).lean();
+    const populatedResult = {
+      ...result,
+      contractorId: {
+        _id: contractor._id,
+        name: contractor.name,
+        contractorRole: contractor.contractorRole
+      },
+      site: result.site ? { _id: result.site, name: 'Site Name' } : null
+    };
 
     res.status(201).json({
       success: true,
       message: "Worker created successfully",
-      data: populatedWorker
+      data: populatedResult
     });
 
   } catch (error) {

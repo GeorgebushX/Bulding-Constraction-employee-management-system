@@ -164,10 +164,10 @@ export const getAllSalaries = async (req, res) => {
                 model: 'Contractor',
                 options: { allowNull: true }
             })
-            .populate('site')
-            .populate('supervisorId')
+            // .populate('site')
+            // .populate('supervisorId')
             .sort({ date: -1, _id: 1 })
-            .lean();
+            .lean();    
 
         // Transform data with null checks
         const responseData = salaries.map(salary => {

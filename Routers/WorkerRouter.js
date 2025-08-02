@@ -29,7 +29,7 @@ router.get('/workers/subroles/:workerRole', getSubRoles);
 router.get('/workers/:id', getWorkerById);
 
 // Create new worker
-router.post('/workers', upload, createWorker);
+router.post('/yes/workers', upload, createWorker);
 
 // Update worker by ID
 router.put('/workers/:id', upload, updateWorkerById);
