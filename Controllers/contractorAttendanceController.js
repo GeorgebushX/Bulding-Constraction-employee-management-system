@@ -93,7 +93,12 @@ export const getContractorAttendance =  async (req, res) => {
       );
 
       const data = await Contractor.find()
-        .select("_id name photo currentAttendance")
+        .select("_id name photo contractorRole currentAttendance")
+        .populate({
+                path: 'supervisorId',
+                select: '_id name email phone supervisorType' // Include supervisor fields you want
+            })
+
         .sort({ name: 1 });
 
       return res.status(200).json({
@@ -224,7 +229,7 @@ export const updateContractorAttendance = async (req, res) => {
         { _id: contractorId },
         updateObj,
         { new: true }
-      ).select("_id name photo currentAttendance");
+      ).select("_id name photo contractorRole currentAttendance");
 
       if (!updatedContractor) {
         return res.status(404).json({

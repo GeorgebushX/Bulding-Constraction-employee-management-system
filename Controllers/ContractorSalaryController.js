@@ -5,10 +5,160 @@ import Contractor from "../models/Contractor.js";
 import exceljs from "exceljs";
 import PDFDocument from "pdfkit";
 
+// // Helper functions
+// const formatDate = (dateString) => {
+//     if (!dateString) return null;
+//     const date = new Date(dateString);
+//     const day = String(date.getDate()).padStart(2, '0');
+//     const month = String(date.getMonth() + 1).padStart(2, '0');
+//     const year = date.getFullYear();
+//     return `${day}/${month}/${year}`;
+// };
+
+// const getMonthName = (month) => {
+//     const months = [
+//         'January', 'February', 'March', 'April', 'May', 'June',
+//         'July', 'August', 'September', 'October', 'November', 'December'
+//     ];
+//     return months[month - 1];
+// };
+
+// // 1. Create Weekly Salary
+// export const createWeeklySalary = async (req, res) => {
+//     try {
+//         const {
+//             name,
+//             startDate,
+//             endDate,
+//             OvertimeOneDaySalary = 200,
+//             HalfdayOneDaySalary = 400,
+//             allowances = 0,
+//             deductions = 0,
+//             advanceSalary = 0,
+//             paidAmount = 0
+//         } = req.body;
+
+//         // Validate inputs
+//         if (!name || !startDate || !endDate) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Name, startDate and endDate are required"
+//             });
+//         }
+
+//         // Find contractor
+//         const contractor = await Contractor.findOne({ name });
+//         if (!contractor) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Contractor not found"
+//             });
+//         }
+
+//         // Parse dates
+//         const [startDay, startMonth, startYear] = startDate.split('/').map(Number);
+//         const [endDay, endMonth, endYear] = endDate.split('/').map(Number);
+
+//         // Calculate working days from attendance
+//         const attendanceRecords = contractor.attendanceRecords.filter(record => {
+//             const [day, month, year] = record.date.split('/').map(Number);
+//             const recordDate = new Date(year, month - 1, day);
+//             const start = new Date(startYear, startMonth - 1, startDay);
+//             const end = new Date(endYear, endMonth - 1, endDay);
+//             return recordDate >= start && recordDate <= end;
+//         });
+
+//         // Count attendance types
+//         const workingDays = attendanceRecords.filter(r => r.status === 'Fullday').length;
+//         const OvertimeDaysCount = attendanceRecords.filter(r => r.status === 'Overtime').length;
+//         const HalfDaysCount = attendanceRecords.filter(r => r.status === 'Halfday').length;
+
+//         // Get salary rates from contractor
+//         const perDaySalary = contractor.perDaySalary || 1000;
+
+//         // Calculate salaries
+//         const basicSalary = (workingDays * perDaySalary) + 
+//                           (OvertimeDaysCount * OvertimeOneDaySalary) - 
+//                           (HalfDaysCount * HalfdayOneDaySalary);
+
+//         const netWeeklySalary = basicSalary + Number(allowances) - Number(deductions);
+//         const balanceAmount = netWeeklySalary - Number(paidAmount) - Number(advanceSalary);
+
+//         // Determine status
+//         let status;
+//         if (paidAmount <= 0) {
+//             status = "Pending";
+//         } else if (balanceAmount <= 0) {
+//             status = "Paid";
+//         } else {
+//             status = "Partial";
+//         }
+
+//         // Get current date for record keeping
+//         const currentDate = new Date();
+//         const recordDate = formatDate(currentDate);
+//         const month = currentDate.getMonth() + 1;
+//         const monthName = getMonthName(month);
+//         const year = currentDate.getFullYear();
+
+//         // Create record
+//         const salaryRecord = new ContractorSalary({
+//             contractorId: contractor._id,
+//             contractorRole: contractor.contractorRole,
+//             site: contractor.site,
+//             supervisorId: contractor.supervisorId,
+//             startDate,
+//             endDate,
+//             date: recordDate,
+//             month,
+//             monthName,
+//             year,
+//             perDaySalary,
+//             OvertimeOneDaySalary,
+//             HalfdayOneDaySalary,
+//             workingDays,
+//             OvertimeDaysCount,
+//             HalfDaysCount,
+//             allowances,
+//             deductions,
+//             advanceSalary,
+//             netWeeklySalary,
+//             paidAmount,
+//             balanceAmount,
+//             status
+//         });
+
+//         await salaryRecord.save();
+
+//         res.status(201).json({
+//             success: true,
+//             data: {
+//                 ...salaryRecord.toObject(),
+//                 contractorId: {
+//                     _id: contractor._id,
+//                     name: contractor.name,
+//                     email: contractor.email,
+//                     phone: contractor.phone,
+//                     contractorRole: contractor.contractorRole,
+//                     perDaySalary: contractor.perDaySalary
+//                 }
+//             }
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: error.message
+//         });
+//     }
+// };
+
+
 // Helper functions
 const formatDate = (dateString) => {
     if (!dateString) return null;
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
@@ -20,7 +170,25 @@ const getMonthName = (month) => {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    return months[month - 1];
+    return months[month - 1] || 'Unknown';
+};
+
+const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    
+    // Try DD/MM/YYYY format first
+    if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+    }
+    
+    // Try ISO format
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) return date;
+    
+    return null;
 };
 
 // 1. Create Weekly Salary
@@ -46,6 +214,17 @@ export const createWeeklySalary = async (req, res) => {
             });
         }
 
+        // Parse and validate dates
+        const start = parseDate(startDate);
+        const end = parseDate(endDate);
+        
+        if (!start || !end) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid date format. Please use DD/MM/YYYY format"
+            });
+        }
+
         // Find contractor
         const contractor = await Contractor.findOne({ name });
         if (!contractor) {
@@ -55,17 +234,11 @@ export const createWeeklySalary = async (req, res) => {
             });
         }
 
-        // Parse dates
-        const [startDay, startMonth, startYear] = startDate.split('/').map(Number);
-        const [endDay, endMonth, endYear] = endDate.split('/').map(Number);
-
         // Calculate working days from attendance
-        const attendanceRecords = contractor.attendanceRecords.filter(record => {
-            const [day, month, year] = record.date.split('/').map(Number);
-            const recordDate = new Date(year, month - 1, day);
-            const start = new Date(startYear, startMonth - 1, startDay);
-            const end = new Date(endYear, endMonth - 1, endDay);
-            return recordDate >= start && recordDate <= end;
+        const attendanceRecords = (contractor.attendanceRecords || []).filter(record => {
+            if (!record || !record.date) return false;
+            const recordDate = parseDate(record.date);
+            return recordDate && recordDate >= start && recordDate <= end;
         });
 
         // Count attendance types
@@ -107,8 +280,8 @@ export const createWeeklySalary = async (req, res) => {
             contractorRole: contractor.contractorRole,
             site: contractor.site,
             supervisorId: contractor.supervisorId,
-            startDate,
-            endDate,
+            startDate: formatDate(start),
+            endDate: formatDate(end),
             date: recordDate,
             month,
             monthName,
@@ -146,12 +319,16 @@ export const createWeeklySalary = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Error creating weekly salary:", error);
         res.status(500).json({
             success: false,
             message: error.message
         });
     }
 };
+
+
+
 
 // 2. Get All Salary Records
 export const getAllSalaries = async (req, res) => {
