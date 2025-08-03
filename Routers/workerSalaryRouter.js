@@ -20,7 +20,7 @@ import authMiddleware from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 // Create a weekly salary for a worker
-router.post('/yes/workers/salary', createWeeklySalary);
+router.post('/workers/salary',authMiddleware, createWeeklySalary);
 
 // Get all salary records
 router.get('/yes/workers/salary', getAllSalaries);
@@ -47,10 +47,10 @@ router.delete('/yes/workers/salary/:id', authMiddleware, deleteSalaryById);
 router.delete('/yes/workers/salary', authMiddleware, deleteAllSalaries);
 
 // Get all worker salaries with flexible filtering
-router.get('/workers/salaries', authMiddleware, getAllWorkerSalaries);
+router.get('yes/workers/salary/reports', authMiddleware, getAllWorkerSalaries);
 
 // Generate worker salary reports with flexible filtering
-router.get('/yes/workers/salaries/reports', authMiddleware, getWorkerSalaryReport);
+router.get('/yes/workers/salaries/report', authMiddleware, getWorkerSalaryReport);
 
 // Generate daily worker salary report
 router.get('/workers/reports/daily/:DD/:MM/:YYYY', authMiddleware, generateDailyWorkerReport);

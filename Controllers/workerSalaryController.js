@@ -48,7 +48,7 @@ export const createWeeklySalary = async (req, res) => {
             name,
             startDate,
             endDate,
-            OvertimeOneDaySalary = 200,
+            OvertimeOneDaySalary = 400,
             HalfdayOneDaySalary = 400,
             allowances = 0,
             deductions = 0,
@@ -191,8 +191,8 @@ export const getAllSalaries = async (req, res) => {
                 model: 'Worker',
                 options: { allowNull: true }
             })
-            .populate('site')
-            .populate('supervisorId')
+            // .populate('site')
+            // .populate('supervisorId')
             .populate('contractorId')
             .sort({ date: -1, _id: 1 })
             .lean();    
@@ -247,8 +247,8 @@ export const getSalaryById = async (req, res) => {
 
         const salary = await WorkerSalary.findById(id)
             .populate('workerId', 'name email phone workerRole workerSubRole')
-            .populate('site')
-            .populate('supervisorId')
+            // .populate('site')
+            // .populate('supervisorId')
             .populate('contractorId');
 
         if (!salary) {

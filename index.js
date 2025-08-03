@@ -39,7 +39,7 @@ import changePassword from "./Routers/settings.js"
 import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
 // workers
 import WorkersDetails from "./Routers/WorkerRouter.js"
-import WorkersAttendance from "./Routers/workersAttendanceRouter.js"
+import WorkersAttendance from "./Routers/workerSalaryRouter.js"
 // connect to the database
 connectDatabase();
 
@@ -63,10 +63,7 @@ app.use("/api",carpentersupervisorRouter)
 app.use("/api",plumbersupervisorRouter)
 app.use("/api",electriciansupervisorRouter)
 app.use("/api",tilessupervisorRouter)
-
 app.use("/api",supervisorRouter)
-
-
 app.use("/api",centeringcontractorRouter)
 // app.use("/api",centeringWorkersRouter)
 app.use("/api", clientRouter)
