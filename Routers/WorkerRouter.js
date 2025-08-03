@@ -5,36 +5,33 @@ import {
   getAllWorkers,
   getWorkerById,
   updateWorkerById,
-  deleteWorkerById,
-  getWorkersByRole,
-  getSubRoles,
-  getContractorsByWorkerRole
+  deleteWorkerById
 } from '../Controllers/workerController.js';
 
 const router = express.Router();
 
+
+// Create new worker
+router.post('/workers', upload, createWorker);
+
 // Get all workers
 router.get('/workers', getAllWorkers);
 
-// Get workers by role
-router.get('/workers/role/:workerRole', getWorkersByRole);
-
-// Get contractors by worker role
-router.get('/workers/contractors/:workerRole', getContractorsByWorkerRole);
-
-// Get valid sub-roles for a worker role
-router.get('/workers/subroles/:workerRole', getSubRoles);
-
 // Get worker by ID
-router.get('/yes/workers/:id', getWorkerById);
-
-// Create new worker
-router.post('/yes/workers', upload, createWorker);
-
+router.get('/workers/:id', getWorkerById);
 // Update worker by ID
-router.put('/yes/workers/:id', upload, updateWorkerById);
+router.put('/workers/:id', upload, updateWorkerById);
 
 // Delete worker by ID
-router.delete('/yes/workers/:id', deleteWorkerById);
+router.delete('/workers/:id', deleteWorkerById);
+
+// Get workers by role
+// router.get('/workers/role/:workerRole', getWorkersByRole);
+
+// Get contractors by worker role
+// router.get('/workers/contractors/:workerRole', getContractorsByWorkerRole);
+
+// Get valid sub-roles for a worker role
+// router.get('/workers/subroles/:workerRole', getSubRoles);
 
 export default router;

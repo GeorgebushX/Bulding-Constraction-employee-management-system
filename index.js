@@ -17,7 +17,7 @@ dotenv.config();
 // import routes
 import authRouter from './Routers/auth.js';
 
-import centeringsupervisorRouter from "././Routers/centeringWorkersRouter.js"
+// import centeringsupervisorRouter from "././Routers/centeringWorkersRouter.js"
 import paintersupervisorRouter from "././Routers/supervisor/painterSupervisorRouter.js"
 import steelsupervisorRouter from "././Routers/supervisor/steelSupervisorRouter.js"
 import mesonsupervisorRouter from "././Routers/supervisor/mesonSupervisorRouter.js"
@@ -29,7 +29,7 @@ import tilessupervisorRouter from "././Routers/supervisor/tilesSupervisorRouter.
 import supervisorRouter from "./Routers/SupervisorRouter.js"
 import contractorAttendance from "./Routers/contractorAttendanceRouter.js"
 import centeringcontractorRouter from "./Routers/contractorRouter.js"
-import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
+// import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
 // import attendanceSupervisor from "./Routers/AttendanceSupervisorRouter.js"
@@ -54,7 +54,7 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 // Routes
 app.use('/api', authRouter);
 
-app.use("/api",centeringsupervisorRouter)
+// app.use("/api",centeringsupervisorRouter)
 app.use("/api",paintersupervisorRouter)
 app.use("/api",steelsupervisorRouter)
 app.use("/api",mesonsupervisorRouter)
@@ -67,7 +67,7 @@ app.use("/api",supervisorRouter)
 
 
 app.use("/api",centeringcontractorRouter)
-app.use("/api",centeringWorkersRouter)
+// app.use("/api",centeringWorkersRouter)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
 // app.use("/api",attendanceSupervisor)

@@ -267,6 +267,8 @@
   // Auto-increment _id
   contractorSchema.plugin(AutoIncrement, { id: 'contractor_id', inc_field: '_id' });
 
-  const Contractor = mongoose.model('Contractor', contractorSchema);
+//  const Contractor = mongoose.models.Contractor || mongoose.model('Contractor', contractorSchema);
+
+const Contractor = mongoose.model('Contractor', contractorSchema);
 
   export default Contractor;
