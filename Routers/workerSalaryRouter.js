@@ -47,7 +47,7 @@ router.delete('/yes/workers/salary/:id', authMiddleware, deleteSalaryById);
 router.delete('/yes/workers/salary', authMiddleware, deleteAllSalaries);
 
 // Get all worker salaries with flexible filtering
-router.get('yes/workers/salary/reports', authMiddleware, getAllWorkerSalaries);
+router.get('/yes/workers/salary/reports', authMiddleware, getAllWorkerSalaries);
 // Generate worker salary reports with flexible filtering
 router.get('/yes/workers/salaries/report', authMiddleware, getWorkerSalaryReport);
 

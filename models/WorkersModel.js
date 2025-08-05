@@ -33,11 +33,11 @@
         default: null
       }
     },
-    recordedAt: {
-      type: Date,
-      default: Date.now,
-      get: formatDateToDDMMYYYY
-    }
+    // recordedAt: {
+    //   type: Date,
+    //   default: Date.now,
+    //   get: formatDateToDDMMYYYY
+    // }
   }, { _id: false });
 
   // Worker schema

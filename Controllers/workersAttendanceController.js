@@ -1497,7 +1497,7 @@ export const getBulkWorkerDataReport = async (req, res) => {
     const { format = 'json' } = req.query;
 
     const workers = await Worker.aggregate([
-      {
+      { 
         $project: {
           _id: 1,
           userId: 1,

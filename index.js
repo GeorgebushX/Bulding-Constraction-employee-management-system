@@ -40,6 +40,7 @@ import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
 // workers
 import WorkersDetails from "./Routers/WorkerRouter.js"
 import WorkersAttendance from "./Routers/workersAttendanceRouter.js"
+import workersSalary from "./Routers/workerSalaryRouter.js"
 // connect to the database
 connectDatabase();
 
@@ -54,27 +55,19 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Routes
 app.use('/api', authRouter);
-
-// app.use("/api",centeringsupervisorRouter)
-app.use("/api",paintersupervisorRouter)
-app.use("/api",steelsupervisorRouter)
-app.use("/api",mesonsupervisorRouter)
-app.use("/api",carpentersupervisorRouter)
-app.use("/api",plumbersupervisorRouter)
-app.use("/api",electriciansupervisorRouter)
-app.use("/api",tilessupervisorRouter)
-app.use("/api",supervisorRouter)
-app.use("/api",centeringcontractorRouter)
-// app.use("/api",centeringWorkersRouter)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
-// app.use("/api",attendanceSupervisor)
+app.use("/api",supervisorRouter)
+
+app.use("/api",centeringcontractorRouter)
+
 app.use("/api",supervisorSalary)
 app.use("/api",changePassword)
 app.use("/api",contractorAttendance)
 app.use("/api",ContractorSalaries)
 app.use("/api",WorkersDetails)
 app.use("/api",WorkersAttendance)
+app.use("/api",workersSalary)
 // start the server
 const PORT = process.env.PORT || 3002;
 
