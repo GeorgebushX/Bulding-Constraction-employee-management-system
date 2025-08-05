@@ -15,27 +15,17 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 // import routes
+// login
 import authRouter from './Routers/auth.js';
-
-// import centeringsupervisorRouter from "././Routers/centeringWorkersRouter.js"
-import paintersupervisorRouter from "././Routers/supervisor/painterSupervisorRouter.js"
-import steelsupervisorRouter from "././Routers/supervisor/steelSupervisorRouter.js"
-import mesonsupervisorRouter from "././Routers/supervisor/mesonSupervisorRouter.js"
-import carpentersupervisorRouter from "././Routers/supervisor/carpenterSupervisorRouter.js"
-import plumbersupervisorRouter from "././Routers/supervisor/plumberSupervisorRouter.js"
-import electriciansupervisorRouter from "././Routers/supervisor/electricianSupervisorRouter.js"
-import tilessupervisorRouter from "././Routers/supervisor/tilesSupervisorRouter.js"
-
-import supervisorRouter from "./Routers/SupervisorRouter.js"
-import contractorAttendance from "./Routers/contractorAttendanceRouter.js"
-import centeringcontractorRouter from "./Routers/contractorRouter.js"
-// import centeringWorkersRouter from "./Routers/centeringWorkersRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
-// import attendanceSupervisor from "./Routers/AttendanceSupervisorRouter.js"
+// supervisor
+import supervisorRouter from "./Routers/SupervisorRouter.js"
 import supervisorSalary from "./Routers/supervisorSalaryRouter.js"
 import changePassword from "./Routers/settings.js"
-
+// contractor
+import contractorRouter from "./Routers/contractorRouter.js"
+import contractorAttendance from "./Routers/contractorAttendanceRouter.js"
 import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
 // workers
 import WorkersDetails from "./Routers/WorkerRouter.js"
@@ -58,11 +48,9 @@ app.use('/api', authRouter);
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
 app.use("/api",supervisorRouter)
-
-app.use("/api",centeringcontractorRouter)
-
 app.use("/api",supervisorSalary)
 app.use("/api",changePassword)
+app.use("/api",contractorRouter)
 app.use("/api",contractorAttendance)
 app.use("/api",ContractorSalaries)
 app.use("/api",WorkersDetails)
