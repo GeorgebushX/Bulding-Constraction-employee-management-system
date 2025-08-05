@@ -18,7 +18,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // Worker Attendance Routes
-router.get("/attendance/workers", authMiddleware, getWorkerAttendance);
+router.get("/yes/workers/attendance", authMiddleware, getWorkerAttendance);
 router.put("/yes/workers/attendance/:id", authMiddleware, updateWorkerAttendance);
 router.put("/workers/attendance/bulk-by-date", authMiddleware, bulkUpdateWorkerAttendanceByDate);
 router.get("/yes/workers/attendance/:day/:month/:year", authMiddleware, getWorkerAttendanceByDate);

@@ -39,7 +39,7 @@ import changePassword from "./Routers/settings.js"
 import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
 // workers
 import WorkersDetails from "./Routers/WorkerRouter.js"
-import WorkersAttendance from "./Routers/workerSalaryRouter.js"
+import WorkersAttendance from "./Routers/workersAttendanceRouter.js"
 // connect to the database
 connectDatabase();
 
