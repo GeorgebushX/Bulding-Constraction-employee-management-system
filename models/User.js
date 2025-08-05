@@ -28,11 +28,12 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, enum: ["Engineer", "Supervisor", "Contractor", "Worker"], required: true },
   roleType: { type: String }, // Unifying role-specific info
+  workerSubRole : { type: String }, // Unifying role-specific info
   photo: { type: String },
   createdAt: { type: String },
   updatedAt: { type: String }
+  
 }, { _id: false });
-
 // Pre-save middleware to handle auto-increment and date formatting
 userSchema.pre("save", async function (next) {
   const doc = this;

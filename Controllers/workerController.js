@@ -326,19 +326,19 @@ export const getAllWorkers = async (req, res) => {
         select: 'name contractorRole site email phone address photo',
         populate: {
           path: 'site',
-          select: 'siteName location startDate endDate status'
+          select: 'siteName location status'
         }
       })
       .populate({
         path: 'supervisorId',
         select: 'name supervisorType site email phone address photo',
-        populate: {
-          path: 'site',
-          select: 'siteName location startDate endDate status'
-        }
+        // populate: {
+        //   path: 'site',
+        //   select: 'siteName location status'
+        // }
       })
-      .populate('site', 'siteName location startDate endDate status')
-      .populate('userId', 'name email role createdAt')
+      .populate('site', 'siteName location status')
+      .populate('userId', 'name email role')
       .lean();
 
     // Format the response with complete data
@@ -377,19 +377,19 @@ export const getAllWorkers = async (req, res) => {
             _id: worker.contractorId.site._id,
             siteName: worker.contractorId.site.siteName,
             location: worker.contractorId.site.location,
-            startDate: worker.contractorId.site.startDate,
-            endDate: worker.contractorId.site.endDate,
+            // startDate: worker.contractorId.site.startDate,
+            // endDate: worker.contractorId.site.endDate,
             status: worker.contractorId.site.status
           } : null
         } : null,
-        site: worker.site ? {
-          _id: worker.site._id,
-          siteName: worker.site.siteName,
-          location: worker.site.location,
-          startDate: worker.site.startDate,
-          endDate: worker.site.endDate,
-          status: worker.site.status
-        } : null,
+        // site: worker.site ? {
+        //   _id: worker.site._id,
+        //   siteName: worker.site.siteName,
+        //   location: worker.site.location,
+        //   // startDate: worker.site.startDate,
+        //   // endDate: worker.site.endDate,
+        //   status: worker.site.status
+        // } : null,
         name: worker.name,
         password: undefined, // Never return password
         gender: worker.gender,
