@@ -1492,19 +1492,211 @@ export const getWorkerMonthlyAttendanceReport = async (req, res) => {
   }
 };
 
+
+
+
+
+
+
+
+
+
+// export const getBulkWorkerDataReport = async (req, res) => {
+//   try {
+//     const { format = 'json' } = req.query;
+
+//     const workers = await Worker.aggregate([
+//       { 
+//         $project: {
+//           _id: 1,
+//           userId: 1,
+//           contractorId: 1,
+//           name: 1,
+//           photo: 1,
+//           workerRole: 1,
+//           allRecords: '$attendanceRecords',
+//           daysPresent: {
+//             $size: {
+//               $filter: {
+//                 input: '$attendanceRecords',
+//                 as: 'record',
+//                 cond: { $ne: ['$$record.currentAttendance.status', null] }
+//               }
+//             }
+//           },
+//           totalDays: {
+//             $size: '$attendanceRecords'
+//           }
+//         }
+//       },
+//       {
+//         $addFields: {
+//           attendanceDetails: {
+//             $map: {
+//               input: '$allRecords',
+//               as: 'record',
+//               in: {
+//                 date: '$$record.currentAttendance.date',
+//                 status: '$$record.currentAttendance.status'
+//               }
+//             }
+//           }
+//         }
+//       },
+//       { $sort: { name: 1 } }
+//     ]);
+
+//     if (format === 'json') {
+//       return res.status(200).json({
+//         success: true,
+//         data: workers,
+//         reportType: 'workerBulkData'
+//       });
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+//       const worksheet = workbook.addWorksheet('Worker Attendance');
+      
+//       worksheet.columns = [
+//         { header: 'Worker ID', key: '_id', width: 15 },
+//         { header: 'Name', key: 'name', width: 30 },
+//         { header: 'Role', key: 'role', width: 25 },
+//         { header: 'Contractor ID', key: 'contractorId', width: 15 },
+//         { header: 'Days Present', key: 'daysPresent', width: 15 },
+//         { header: 'Total Days', key: 'totalDays', width: 15 },
+//         { header: 'Attendance Rate', key: 'attendanceRate', width: 20 }
+//       ];
+      
+//       workers.forEach(worker => {
+//         const attendanceRate = worker.totalDays > 0 
+//           ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
+//           : 'N/A';
+          
+//         worksheet.addRow({
+//           _id: worker._id,
+//           name: worker.name,
+//           role: worker.workerRole,
+//           contractorId: worker.contractorId,
+//           daysPresent: worker.daysPresent,
+//           totalDays: worker.totalDays,
+//           attendanceRate
+//         });
+//       });
+      
+//       // Add details sheet
+//       const detailsSheet = workbook.addWorksheet('Details');
+//       detailsSheet.columns = [
+//         { header: 'Worker ID', key: '_id', width: 15 },
+//         { header: 'Name', key: 'name', width: 30 },
+//         { header: 'Date', key: 'date', width: 15 },
+//         { header: 'Status', key: 'status', width: 15 }
+//       ];
+      
+//       workers.forEach(worker => {
+//         worker.attendanceDetails.forEach(detail => {
+//           detailsSheet.addRow({
+//             _id: worker._id,
+//             name: worker.name,
+//             date: detail.date,
+//             status: detail.status || 'Not Recorded'
+//           });
+//         });
+//       });
+      
+//       // Set response headers
+//       res.setHeader(
+//         'Content-Type',
+//         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+//       );
+//       res.setHeader(
+//         'Content-Disposition',
+//         'attachment; filename=worker_attendance_full_report.xlsx'
+//       );
+      
+//       return workbook.xlsx.write(res).then(() => res.end());
+      
+//     } else if (format === 'pdf') {
+//       const doc = new pdfkit();
+//       const filename = 'worker_attendance_full_report.pdf';
+      
+//       res.setHeader('Content-Type', 'application/pdf');
+//       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+//       doc.pipe(res);
+//       doc.fontSize(18).text('Complete Worker Attendance Report', { align: 'center' });
+//       doc.moveDown();
+      
+//       doc.fontSize(12);
+//       workers.forEach((worker, index) => {
+//         const attendanceRate = worker.totalDays > 0 
+//           ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
+//           : 'N/A';
+          
+//         doc.text(`${index + 1}. ${worker.name} (${worker.workerRole})`);
+//         doc.text(`   Contractor ID: ${worker.contractorId}`);
+//         doc.text(`   Days Present: ${worker.daysPresent} of ${worker.totalDays} (${attendanceRate})`);
+        
+//         // Add details for each worker
+//         if (worker.attendanceDetails.length > 0) {
+//           doc.text('   Details:');
+//           worker.attendanceDetails.forEach(detail => {
+//             doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
+//           });
+//         }
+        
+//         doc.moveDown(0.5);
+//       });
+      
+//       doc.end();
+//     } else {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid format parameter. Use json, excel, or pdf"
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error generating worker bulk data report:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
+
 export const getBulkWorkerDataReport = async (req, res) => {
   try {
     const { format = 'json' } = req.query;
 
+    // First get all workers with their basic attendance data
     const workers = await Worker.aggregate([
+      { 
+        $lookup: {
+          from: 'contractors',
+          localField: 'contractorId',
+          foreignField: '_id',
+          as: 'contractorDetails'
+        }
+      },
+      { $unwind: '$contractorDetails' },
       { 
         $project: {
           _id: 1,
           userId: 1,
-          contractorId: 1,
           name: 1,
           photo: 1,
           workerRole: 1,
+          workerSubRole: 1,
+          perDaySalary: 1,
+          contractorId: 1,
+          contractorUserId: '$contractorDetails.userId', // Add contractor's userId
+          contractorName: '$contractorDetails.name',
+          contractorPhone: '$contractorDetails.phone',
+          contractorEmail: '$contractorDetails.email',
+          contractorRole: '$contractorDetails.contractorRole',
+         
           allRecords: '$attendanceRecords',
           daysPresent: {
             $size: {
@@ -1512,6 +1704,24 @@ export const getBulkWorkerDataReport = async (req, res) => {
                 input: '$attendanceRecords',
                 as: 'record',
                 cond: { $ne: ['$$record.currentAttendance.status', null] }
+              }
+            }
+          },
+          daysHalfday: {
+            $size: {
+              $filter: {
+                input: '$attendanceRecords',
+                as: 'record',
+                cond: { $eq: ['$$record.currentAttendance.status', 'Halfday'] }
+              }
+            }
+          },
+          daysOvertime: {
+            $size: {
+              $filter: {
+                input: '$attendanceRecords',
+                as: 'record',
+                cond: { $eq: ['$$record.currentAttendance.status', 'Overtime'] }
               }
             }
           },
@@ -1531,6 +1741,17 @@ export const getBulkWorkerDataReport = async (req, res) => {
                 status: '$$record.currentAttendance.status'
               }
             }
+          },
+          totalEarnings: {
+            $multiply: [
+              {
+                $add: [
+                  '$daysPresent',
+                  { $multiply: ['$daysHalfday', 0.5] }
+                ]
+              },
+              '$perDaySalary'
+            ]
           }
         }
       },
@@ -1545,16 +1766,24 @@ export const getBulkWorkerDataReport = async (req, res) => {
       });
     } else if (format === 'excel') {
       const workbook = new exceljs.Workbook();
-      const worksheet = workbook.addWorksheet('Worker Attendance');
+      const worksheet = workbook.addWorksheet('Worker Summary');
       
+      // Summary Sheet
       worksheet.columns = [
         { header: 'Worker ID', key: '_id', width: 15 },
         { header: 'Name', key: 'name', width: 30 },
-        { header: 'Role', key: 'role', width: 25 },
+        { header: 'Role', key: 'workerRole', width: 25 },
+        { header: 'Sub-Role', key: 'workerSubRole', width: 25 },
         { header: 'Contractor ID', key: 'contractorId', width: 15 },
+        { header: 'Contractor User ID', key: 'contractorUserId', width: 20 }, // Added contractor userId
+        { header: 'Contractor Name', key: 'contractorName', width: 30 },
         { header: 'Days Present', key: 'daysPresent', width: 15 },
+        { header: 'Half Days', key: 'daysHalfday', width: 15 },
+        { header: 'Overtime Days', key: 'daysOvertime', width: 15 },
         { header: 'Total Days', key: 'totalDays', width: 15 },
-        { header: 'Attendance Rate', key: 'attendanceRate', width: 20 }
+        { header: 'Attendance Rate', key: 'attendanceRate', width: 20 },
+        { header: 'Daily Wage', key: 'perDaySalary', width: 15 },
+        { header: 'Total Earnings', key: 'totalEarnings', width: 20 }
       ];
       
       workers.forEach(worker => {
@@ -1565,19 +1794,28 @@ export const getBulkWorkerDataReport = async (req, res) => {
         worksheet.addRow({
           _id: worker._id,
           name: worker.name,
-          role: worker.workerRole,
+          workerRole: worker.workerRole,
+          workerSubRole: worker.workerSubRole,
           contractorId: worker.contractorId,
+          contractorUserId: worker.contractorUserId, // Added contractor userId
+          contractorName: worker.contractorName,
           daysPresent: worker.daysPresent,
+          daysHalfday: worker.daysHalfday,
+          daysOvertime: worker.daysOvertime,
           totalDays: worker.totalDays,
-          attendanceRate
+          attendanceRate,
+          perDaySalary: worker.perDaySalary,
+          totalEarnings: worker.totalEarnings
         });
       });
       
       // Add details sheet
-      const detailsSheet = workbook.addWorksheet('Details');
+      const detailsSheet = workbook.addWorksheet('Attendance Details');
       detailsSheet.columns = [
         { header: 'Worker ID', key: '_id', width: 15 },
         { header: 'Name', key: 'name', width: 30 },
+        { header: 'Contractor', key: 'contractorName', width: 30 },
+        { header: 'Contractor User ID', key: 'contractorUserId', width: 20 }, // Added contractor userId
         { header: 'Date', key: 'date', width: 15 },
         { header: 'Status', key: 'status', width: 15 }
       ];
@@ -1587,10 +1825,48 @@ export const getBulkWorkerDataReport = async (req, res) => {
           detailsSheet.addRow({
             _id: worker._id,
             name: worker.name,
+            contractorName: worker.contractorName,
+            contractorUserId: worker.contractorUserId, // Added contractor userId
             date: detail.date,
             status: detail.status || 'Not Recorded'
           });
         });
+      });
+      
+      // Add contractor summary sheet
+      const contractorSummary = workbook.addWorksheet('Contractor Summary');
+      contractorSummary.columns = [
+        { header: 'Contractor ID', key: '_id', width: 15 },
+        { header: 'Contractor User ID', key: 'userId', width: 20 }, // Added contractor userId
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Phone', key: 'phone', width: 20 },
+        { header: 'Workers Count', key: 'workersCount', width: 15 },
+        { header: 'Total Wages', key: 'totalWages', width: 20 }
+      ];
+      
+      // Group workers by contractor
+      const contractorsMap = new Map();
+      workers.forEach(worker => {
+        if (!contractorsMap.has(worker.contractorId)) {
+          contractorsMap.set(worker.contractorId, {
+            _id: worker.contractorId,
+            userId: worker.contractorUserId, // Added contractor userId
+            name: worker.contractorName,
+            email: worker.contractorEmail,
+            phone: worker.contractorPhone,
+            workersCount: 0,
+            totalWages: 0
+          });
+        }
+        const contractor = contractorsMap.get(worker.contractorId);
+        contractor.workersCount++;
+        contractor.totalWages += worker.totalEarnings || 0;
+      });
+      
+      // Add contractor data to sheet
+      contractorsMap.forEach(contractor => {
+        contractorSummary.addRow(contractor);
       });
       
       // Set response headers
@@ -1617,23 +1893,74 @@ export const getBulkWorkerDataReport = async (req, res) => {
       doc.moveDown();
       
       doc.fontSize(12);
-      workers.forEach((worker, index) => {
-        const attendanceRate = worker.totalDays > 0 
-          ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
-          : 'N/A';
-          
-        doc.text(`${index + 1}. ${worker.name} (${worker.workerRole})`);
-        doc.text(`   Contractor ID: ${worker.contractorId}`);
-        doc.text(`   Days Present: ${worker.daysPresent} of ${worker.totalDays} (${attendanceRate})`);
-        
-        // Add details for each worker
-        if (worker.attendanceDetails.length > 0) {
-          doc.text('   Details:');
-          worker.attendanceDetails.forEach(detail => {
-            doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
-          });
+      
+      // Group workers by contractor for better PDF organization
+      const workersByContractor = {};
+      workers.forEach(worker => {
+        if (!workersByContractor[worker.contractorId]) {
+          workersByContractor[worker.contractorId] = {
+            contractorName: worker.contractorName,
+            contractorUserId: worker.contractorUserId, // Added contractor userId
+            workers: []
+          };
         }
+        workersByContractor[worker.contractorId].workers.push(worker);
+      });
+      
+      // Generate PDF content
+      Object.entries(workersByContractor).forEach(([contractorId, contractorData], index) => {
+        doc.text(`Contractor: ${contractorData.contractorName} (User ID: ${contractorData.contractorUserId})`, { underline: true });
+        doc.moveDown(0.5);
         
+        contractorData.workers.forEach((worker, workerIndex) => {
+          const attendanceRate = worker.totalDays > 0 
+            ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
+            : 'N/A';
+            
+          doc.text(`${workerIndex + 1}. ${worker.name} (${worker.workerRole})`);
+          doc.text(`   Worker ID: ${worker._id}`);
+          doc.text(`   Days Present: ${worker.daysPresent} (${worker.daysHalfday} half days, ${worker.daysOvertime} overtime)`);
+          doc.text(`   Total Days: ${worker.totalDays} (${attendanceRate} attendance)`);
+          doc.text(`   Daily Wage: ₹${worker.perDaySalary}`);
+          doc.text(`   Total Earnings: ₹${worker.totalEarnings || 0}`);
+          
+          // Add details for each worker
+          if (worker.attendanceDetails.length > 0) {
+            doc.text('   Attendance Details:');
+            worker.attendanceDetails.forEach(detail => {
+              doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
+            });
+          }
+          
+          doc.moveDown(0.5);
+        });
+        
+        doc.moveDown();
+      });
+      
+      // Add summary section
+      doc.addPage();
+      doc.fontSize(16).text('Contractor Summary', { align: 'center' });
+      doc.moveDown();
+      
+      const contractorsSummary = {};
+      workers.forEach(worker => {
+        if (!contractorsSummary[worker.contractorId]) {
+          contractorsSummary[worker.contractorId] = {
+            name: worker.contractorName,
+            userId: worker.contractorUserId, // Added contractor userId
+            workerCount: 0,
+            totalWages: 0
+          };
+        }
+        contractorsSummary[worker.contractorId].workerCount++;
+        contractorsSummary[worker.contractorId].totalWages += worker.totalEarnings || 0;
+      });
+      
+      Object.entries(contractorsSummary).forEach(([contractorId, summary], idx) => {
+        doc.text(`${idx + 1}. ${summary.name} (User ID: ${summary.userId})`);
+        doc.text(`   Workers: ${summary.workerCount}`);
+        doc.text(`   Total Wages: ₹${summary.totalWages}`);
         doc.moveDown(0.5);
       });
       
@@ -1653,3 +1980,313 @@ export const getBulkWorkerDataReport = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+// export const getBulkWorkerDataReport = async (req, res) => {
+//   try {
+//     const { format = 'json' } = req.query;
+
+//     // First get all workers with their basic attendance data
+//     const workers = await Worker.aggregate([
+//       { 
+//         $lookup: {
+//           from: 'contractors',
+//           localField: 'contractorId',
+//           foreignField: '_id',
+//           as: 'contractorDetails'
+//         }
+//       },
+//       { $unwind: '$contractorDetails' },
+//       { 
+//         $project: {
+//           _id: 1,
+//           userId: 1,
+//            name: 1,
+//           photo: 1,
+//           workerRole: 1,
+//           workerSubRole: 1,
+//           perDaySalary: 1,
+//           contractorId: 1,
+//           contractorName: '$contractorDetails.name',
+//           contractorPhone: '$contractorDetails.phone',
+//           contractorEmail: '$contractorDetails.email',
+//           contractorRole: '$contractorDetails.contractorRole',
+         
+//           allRecords: '$attendanceRecords',
+//           daysPresent: {
+//             $size: {
+//               $filter: {
+//                 input: '$attendanceRecords',
+//                 as: 'record',
+//                 cond: { $ne: ['$$record.currentAttendance.status', null] }
+//               }
+//             }
+//           },
+//           daysHalfday: {
+//             $size: {
+//               $filter: {
+//                 input: '$attendanceRecords',
+//                 as: 'record',
+//                 cond: { $eq: ['$$record.currentAttendance.status', 'Halfday'] }
+//               }
+//             }
+//           },
+//           daysOvertime: {
+//             $size: {
+//               $filter: {
+//                 input: '$attendanceRecords',
+//                 as: 'record',
+//                 cond: { $eq: ['$$record.currentAttendance.status', 'Overtime'] }
+//               }
+//             }
+//           },
+//           totalDays: {
+//             $size: '$attendanceRecords'
+//           }
+//         }
+//       },
+//       {
+//         $addFields: {
+//           attendanceDetails: {
+//             $map: {
+//               input: '$allRecords',
+//               as: 'record',
+//               in: {
+//                 date: '$$record.currentAttendance.date',
+//                 status: '$$record.currentAttendance.status'
+//               }
+//             }
+//           },
+//           totalEarnings: {
+//             $multiply: [
+//               {
+//                 $add: [
+//                   '$daysPresent',
+//                   { $multiply: ['$daysHalfday', 0.5] }
+//                 ]
+//               },
+//               '$perDaySalary'
+//             ]
+//           }
+//         }
+//       },
+//       { $sort: { name: 1 } }
+//     ]);
+
+//     if (format === 'json') {
+//       return res.status(200).json({
+//         success: true,
+//         data: workers,
+//         reportType: 'workerBulkData'
+//       });
+//     } else if (format === 'excel') {
+//       const workbook = new exceljs.Workbook();
+//       const worksheet = workbook.addWorksheet('Worker Summary');
+      
+//       // Summary Sheet
+//       worksheet.columns = [
+//         { header: 'Worker ID', key: '_id', width: 15 },
+//         { header: 'Name', key: 'name', width: 30 },
+//         { header: 'Role', key: 'workerRole', width: 25 },
+//         { header: 'Sub-Role', key: 'workerSubRole', width: 25 },
+//         { header: 'Contractor ID', key: 'contractorId', width: 15 },
+//         { header: 'Contractor Name', key: 'contractorName', width: 30 },
+//         { header: 'Days Present', key: 'daysPresent', width: 15 },
+//         { header: 'Half Days', key: 'daysHalfday', width: 15 },
+//         { header: 'Overtime Days', key: 'daysOvertime', width: 15 },
+//         { header: 'Total Days', key: 'totalDays', width: 15 },
+//         { header: 'Attendance Rate', key: 'attendanceRate', width: 20 },
+//         { header: 'Daily Wage', key: 'perDaySalary', width: 15 },
+//         { header: 'Total Earnings', key: 'totalEarnings', width: 20 }
+//       ];
+      
+//       workers.forEach(worker => {
+//         const attendanceRate = worker.totalDays > 0 
+//           ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
+//           : 'N/A';
+          
+//         worksheet.addRow({
+//           _id: worker._id,
+//           name: worker.name,
+//           workerRole: worker.workerRole,
+//           workerSubRole: worker.workerSubRole,
+//           contractorId: worker.contractorId,
+//           contractorName: worker.contractorName,
+//           daysPresent: worker.daysPresent,
+//           daysHalfday: worker.daysHalfday,
+//           daysOvertime: worker.daysOvertime,
+//           totalDays: worker.totalDays,
+//           attendanceRate,
+//           perDaySalary: worker.perDaySalary,
+//           totalEarnings: worker.totalEarnings
+//         });
+//       });
+      
+//       // Add details sheet
+//       const detailsSheet = workbook.addWorksheet('Attendance Details');
+//       detailsSheet.columns = [
+//         { header: 'Worker ID', key: '_id', width: 15 },
+//         { header: 'Name', key: 'name', width: 30 },
+//         { header: 'Contractor', key: 'contractorName', width: 30 },
+//         { header: 'Date', key: 'date', width: 15 },
+//         { header: 'Status', key: 'status', width: 15 }
+//       ];
+      
+//       workers.forEach(worker => {
+//         worker.attendanceDetails.forEach(detail => {
+//           detailsSheet.addRow({
+//             _id: worker._id,
+//             name: worker.name,
+//             contractorName: worker.contractorName,
+//             date: detail.date,
+//             status: detail.status || 'Not Recorded'
+//           });
+//         });
+//       });
+      
+//       // Add contractor summary sheet
+//       const contractorSummary = workbook.addWorksheet('Contractor Summary');
+//       contractorSummary.columns = [
+//         { header: 'Contractor ID', key: '_id', width: 15 },
+//         { header: 'Name', key: 'name', width: 30 },
+//         { header: 'Email', key: 'email', width: 30 },
+//         { header: 'Phone', key: 'phone', width: 20 },
+//         { header: 'Workers Count', key: 'workersCount', width: 15 },
+//         { header: 'Total Wages', key: 'totalWages', width: 20 }
+//       ];
+      
+//       // Group workers by contractor
+//       const contractorsMap = new Map();
+//       workers.forEach(worker => {
+//         if (!contractorsMap.has(worker.contractorId)) {
+//           contractorsMap.set(worker.contractorId, {
+//             _id: worker.contractorId,
+//             name: worker.contractorName,
+//             email: worker.contractorEmail,
+//             phone: worker.contractorPhone,
+//             workersCount: 0,
+//             totalWages: 0
+//           });
+//         }
+//         const contractor = contractorsMap.get(worker.contractorId);
+//         contractor.workersCount++;
+//         contractor.totalWages += worker.totalEarnings || 0;
+//       });
+      
+//       // Add contractor data to sheet
+//       contractorsMap.forEach(contractor => {
+//         contractorSummary.addRow(contractor);
+//       });
+      
+//       // Set response headers
+//       res.setHeader(
+//         'Content-Type',
+//         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+//       );
+//       res.setHeader(
+//         'Content-Disposition',
+//         'attachment; filename=worker_attendance_full_report.xlsx'
+//       );
+      
+//       return workbook.xlsx.write(res).then(() => res.end());
+      
+//     } else if (format === 'pdf') {
+//       const doc = new pdfkit();
+//       const filename = 'worker_attendance_full_report.pdf';
+      
+//       res.setHeader('Content-Type', 'application/pdf');
+//       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+//       doc.pipe(res);
+//       doc.fontSize(18).text('Complete Worker Attendance Report', { align: 'center' });
+//       doc.moveDown();
+      
+//       doc.fontSize(12);
+      
+//       // Group workers by contractor for better PDF organization
+//       const workersByContractor = {};
+//       workers.forEach(worker => {
+//         if (!workersByContractor[worker.contractorId]) {
+//           workersByContractor[worker.contractorId] = {
+//             contractorName: worker.contractorName,
+//             workers: []
+//           };
+//         }
+//         workersByContractor[worker.contractorId].workers.push(worker);
+//       });
+      
+//       // Generate PDF content
+//       Object.entries(workersByContractor).forEach(([contractorId, contractorData], index) => {
+//         doc.text(`Contractor: ${contractorData.contractorName}`, { underline: true });
+//         doc.moveDown(0.5);
+        
+//         contractorData.workers.forEach((worker, workerIndex) => {
+//           const attendanceRate = worker.totalDays > 0 
+//             ? (worker.daysPresent / worker.totalDays * 100).toFixed(2) + '%'
+//             : 'N/A';
+            
+//           doc.text(`${workerIndex + 1}. ${worker.name} (${worker.workerRole})`);
+//           doc.text(`   Worker ID: ${worker._id}`);
+//           doc.text(`   Days Present: ${worker.daysPresent} (${worker.daysHalfday} half days, ${worker.daysOvertime} overtime)`);
+//           doc.text(`   Total Days: ${worker.totalDays} (${attendanceRate} attendance)`);
+//           doc.text(`   Daily Wage: ₹${worker.perDaySalary}`);
+//           doc.text(`   Total Earnings: ₹${worker.totalEarnings || 0}`);
+          
+//           // Add details for each worker
+//           if (worker.attendanceDetails.length > 0) {
+//             doc.text('   Attendance Details:');
+//             worker.attendanceDetails.forEach(detail => {
+//               doc.text(`     ${detail.date}: ${detail.status || 'Not Recorded'}`);
+//             });
+//           }
+          
+//           doc.moveDown(0.5);
+//         });
+        
+//         doc.moveDown();
+//       });
+      
+//       // Add summary section
+//       doc.addPage();
+//       doc.fontSize(16).text('Contractor Summary', { align: 'center' });
+//       doc.moveDown();
+      
+//       const contractorsSummary = {};
+//       workers.forEach(worker => {
+//         if (!contractorsSummary[worker.contractorId]) {
+//           contractorsSummary[worker.contractorId] = {
+//             name: worker.contractorName,
+//             workerCount: 0,
+//             totalWages: 0
+//           };
+//         }
+//         contractorsSummary[worker.contractorId].workerCount++;
+//         contractorsSummary[worker.contractorId].totalWages += worker.totalEarnings || 0;
+//       });
+      
+//       Object.entries(contractorsSummary).forEach(([contractorId, summary], idx) => {
+//         doc.text(`${idx + 1}. ${summary.name}`);
+//         doc.text(`   Workers: ${summary.workerCount}`);
+//         doc.text(`   Total Wages: ₹${summary.totalWages}`);
+//         doc.moveDown(0.5);
+//       });
+      
+//       doc.end();
+//     } else {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid format parameter. Use json, excel, or pdf"
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error generating worker bulk data report:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };

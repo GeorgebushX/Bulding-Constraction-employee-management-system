@@ -15,19 +15,15 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 // import routes
-// login
 import authRouter from './Routers/auth.js';
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
-// supervisor
 import supervisorRouter from "./Routers/SupervisorRouter.js"
 import supervisorSalary from "./Routers/supervisorSalaryRouter.js"
 import changePassword from "./Routers/settings.js"
-// contractor
 import contractorRouter from "./Routers/contractorRouter.js"
 import contractorAttendance from "./Routers/contractorAttendanceRouter.js"
 import ContractorSalaries from "./Routers/ContractorSalaryRouter.js"
-// workers
 import WorkersDetails from "./Routers/WorkerRouter.js"
 import WorkersAttendance from "./Routers/workersAttendanceRouter.js"
 import workersSalary from "./Routers/workerSalaryRouter.js"
