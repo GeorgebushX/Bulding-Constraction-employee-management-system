@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 
 const contractorSalarySchema = new mongoose.Schema({
+     userId: { type: Number, ref: "User", required: true },
     _id: { type: Number }, // Will be auto-incremented
     contractorId: { 
         type: Number,

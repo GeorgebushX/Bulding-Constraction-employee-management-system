@@ -25,7 +25,7 @@ const router = express.Router();
 router.post('/yes/contractors/salary', authMiddleware, createWeeklySalary);
 
 // Get all salary records
-router.get('/yes/contractors/salary', getAllSalaries);
+router.get('/yes/contractors/salary', authMiddleware, getAllSalaries);
 
 // Assign salary to all contractors for a given week
 router.post('/yes/contractors/salary/bulk', authMiddleware, assignSalaryToAllContractors);

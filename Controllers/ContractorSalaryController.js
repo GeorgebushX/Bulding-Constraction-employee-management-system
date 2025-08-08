@@ -330,6 +330,68 @@ export const createWeeklySalary = async (req, res) => {
 
 
 
+// // 2. Get All Salary Records
+// export const getAllSalaries = async (req, res) => {
+//     try {
+//         // Get all salaries with contractor population
+//         const salaries = await ContractorSalary.find({})
+//         // .populate({
+//         //     path:"userId",
+//         // })
+//             .populate({
+//                 path: 'contractorId',
+//                 select: 'userId name email phone contractorRole',
+//                 model: 'Contractor',
+//                 options: { allowNull: true }
+//             })
+//             // .populate('site')
+//             .populate('supervisorId')
+//             .sort({ date: -1, _id: 1 })
+//             .lean();    
+
+//         // Transform data with null checks
+//         const responseData = salaries.map(salary => {
+//             // Handle case where contractor is deleted but reference exists
+//             const contractorData = salary.contractorId ? {
+//                 userId:salary.contractorID.userId,
+//                 _id: salary.contractorId._id,
+//                 name: salary.contractorId.name || 'Deleted Contractor',
+//                 email: salary.contractorId.email || null,
+//                 phone: salary.contractorId.phone || null,
+//                 contractorRole: salary.contractorId.contractorRole || null,
+//                 perDaySalary: salary.contractorId.perDaySalary || null
+//             } : {
+//                 userId:null,
+//                 _id: null,
+//                 name: 'Unknown Contractor',
+//                 email: null,
+//                 phone: null,
+//                 contractorRole: null
+//             };
+
+//             return {
+//                 ...salary,
+//                 contractorId: contractorData,
+                
+//             };
+//         });
+
+//         res.status(200).json({
+//             success: true,
+//             count: responseData.length,
+//             data: responseData
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: error.message.includes('Cast to ObjectId failed') 
+//                 ? 'Invalid contractor reference format' 
+//                 : error.message
+//         });
+//     }
+// };
+
 // 2. Get All Salary Records
 export const getAllSalaries = async (req, res) => {
     try {
@@ -337,11 +399,10 @@ export const getAllSalaries = async (req, res) => {
         const salaries = await ContractorSalary.find({})
             .populate({
                 path: 'contractorId',
-                select: 'name email phone contractorRole',
+                select: 'userId name email phone contractorRole',
                 model: 'Contractor',
                 options: { allowNull: true }
             })
-            // .populate('site')
             .populate('supervisorId')
             .sort({ date: -1, _id: 1 })
             .lean();    
@@ -350,6 +411,7 @@ export const getAllSalaries = async (req, res) => {
         const responseData = salaries.map(salary => {
             // Handle case where contractor is deleted but reference exists
             const contractorData = salary.contractorId ? {
+                userId: salary.contractorId.userId,  // Fixed: changed contractorID to contractorId
                 _id: salary.contractorId._id,
                 name: salary.contractorId.name || 'Deleted Contractor',
                 email: salary.contractorId.email || null,
@@ -357,6 +419,7 @@ export const getAllSalaries = async (req, res) => {
                 contractorRole: salary.contractorId.contractorRole || null,
                 perDaySalary: salary.contractorId.perDaySalary || null
             } : {
+                userId: null,
                 _id: null,
                 name: 'Unknown Contractor',
                 email: null,
@@ -366,7 +429,7 @@ export const getAllSalaries = async (req, res) => {
 
             return {
                 ...salary,
-                contractorId: contractorData
+                contractorId: contractorData,
             };
         });
 
