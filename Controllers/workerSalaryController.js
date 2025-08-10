@@ -979,13 +979,13 @@ export const getWorkerSalaryReport = async (req, res) => {
         const salaries = await WorkerSalary.find(query)
             .populate({
                 path: 'workerId',
-                select: 'name email phone workerRole workerSubRole perDaySalary',
+                select: ' userId name email phone workerRole workerSubRole perDaySalary',
                 model: 'Worker',
                 options: { allowNull: true }
             })
             .populate('site')
-            .populate('supervisorId')
             .populate('contractorId')
+            .populate('supervisorId')
             .sort({ year: -1, month: -1, 'workerId.name': 1 })
             .lean();
 
