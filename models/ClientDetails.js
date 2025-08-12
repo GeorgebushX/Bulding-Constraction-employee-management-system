@@ -30,7 +30,7 @@ const clientSchema = new mongoose.Schema({
     }
   },
   name: { type: String },
-  email: { type: String },
+  email: { type: String, unique: true, lowercase: true},
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   phone: { type: String },
   alternatePhone: { type: String },

@@ -913,7 +913,6 @@ export const getAllWorkerSalaries = async (req, res) => {
         });
     }
 };
-
 // 11. Get Salary Report (flexible filtering)
 export const getWorkerSalaryReport = async (req, res) => {
     try {
