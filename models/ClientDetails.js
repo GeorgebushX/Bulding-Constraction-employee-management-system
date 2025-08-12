@@ -30,14 +30,17 @@ const clientSchema = new mongoose.Schema({
     }
   },
   name: { type: String },
-  email: { 
+    email: { 
     type: String, 
     unique: true, 
     lowercase: true,
-    match: [
-      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-      'Please enter a valid email address'
-    ]
+    validate: {
+      validator: function(v) {
+        return /^[a-z0-9]+(?:[._%+-][a-z0-9]+)*@[a-z0-9-]+(?:\.[a-z]{2,})+$/i.test(v);
+      },
+      message: props => `${props.value} is not a valid email address! Please use format like ales122@gmail.com`
+    },
+    required: [true, 'Email address is required']
   },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
   phone: { 
