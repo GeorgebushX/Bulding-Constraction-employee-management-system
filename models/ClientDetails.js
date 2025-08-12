@@ -30,22 +30,49 @@ const clientSchema = new mongoose.Schema({
     }
   },
   name: { type: String },
-  email: { type: String, unique: true, lowercase: true},
+  email: { 
+    type: String, 
+    unique: true, 
+    lowercase: true,
+    match: [
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+      'Please enter a valid email address'
+    ]
+  },
   gender: { type: String, enum: ['Male', 'Female', 'Other'] },
-  phone: { type: String },
-  alternatePhone: { type: String },
+  phone: { 
+    type: String,
+    match: [
+      /^[0-9]{10}$/,
+      'Please enter a valid 10-digit phone number'
+    ]
+  },
+  alternatePhone: { 
+    type: String,
+    match: [
+      /^[0-9]{10}$/,
+      'Please enter a valid 10-digit phone number'
+    ]
+  },
   address: { type: String },
   permanentAddress: { type: String },
   nationality: { type: String },
   organizationName: { type: String },
-  // contactPerson Information
-   contactPerson: { type: String },
-   contactPersonPhone: { type: String },
   photo: { type: String },
   startdate: {
     type: String,
     default: () => formatDate(new Date())
   },
+  // contactPerson Information
+   contactPerson: { type: String },
+   contactPersonPhone: { 
+    type: String,
+    match: [
+      /^[0-9]{10}$/,
+      'Please enter a valid 10-digit phone number'
+    ]
+  },
+  contactPersonAddress: { type: String },
   createdAt: {
     type: String,
     default: () => formatDate(new Date())
