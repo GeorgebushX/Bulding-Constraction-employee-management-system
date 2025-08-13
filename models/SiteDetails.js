@@ -138,19 +138,4 @@ const Site = mongoose.model('Site', siteSchema);
 
 export default Site;
 
-
-  //   workersCount: {
-  //   supervisors: [{ 
-  //     type: Number, 
-  //     ref: "Supervisor" 
-  //   }],
-  //   contractors: [{ 
-  //     type: Number, 
-  //     ref: "Contractor" 
-  //   }]
-  // },
-  // supervisors: { 
-  //   type: Number,
-  //   ref: "Supervisor",
-  // },
-  // contractors: { type: Number, ref: "Contractor" },
+ 
