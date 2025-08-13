@@ -1,111 +1,4 @@
 
-// import Site from "../models/SiteDetails.js";
-// import Client from "../models/ClientDetails.js";
-// import multer from "multer";
-// import path from "path";
-// import fs from "fs";
-
-// // Ensure uploads directory exists
-// const uploadDir = path.join(process.cwd(), "public", "uploads");
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
-
-// // Multer config for siteMap image upload
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, uploadDir);
-//   },
-//   filename: (req, file, cb) => {
-//     cb(null, Date.now() + path.extname(file.originalname));
-//   }
-// });
-
-// export const upload = multer({ storage }).single("siteMap");
-
-// // ✅ Add Site
-// export const addSite = async (req, res) => {
-//   try {
-//     const {
-//       client,
-//       siteName,
-//       location,
-//       totalAreaSqFt,
-//       oneAreaSqFtAmount,
-//       startDate,
-//       endDate,
-//       status = 'Planned',
-//       notes,
-//       totalSupervisors = 0,
-//       totalContractors = 0
-//     } = req.body;
-
-//     // Validate required fields
-//     if (!siteName || !location || !totalAreaSqFt || !oneAreaSqFtAmount) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Site name, location, total area, and area amount are required fields"
-//       });
-//     }
-
-//     // Validate client exists if provided
-//     if (client) {
-//       const clientExists = await Client.findById(client);
-//       if (!clientExists) {
-//         return res.status(404).json({
-//           success: false,
-//           message: "Client not found"
-//         });
-//       }
-//     }
-
-//     const siteMap = req.file ? `/uploads/${req.file.filename}` : undefined;
-
-//     const newSite = new Site({
-//       client: client || undefined,
-//       siteName,
-//       location,
-//       totalAreaSqFt: Number(totalAreaSqFt),
-//       oneAreaSqFtAmount: Number(oneAreaSqFtAmount),
-//       startDate: startDate || formatDate(new Date()),
-//       endDate: endDate || undefined,
-//       status,
-//       notes,
-//       siteMap,
-//       totalSupervisors: Number(totalSupervisors),
-//       totalContractors: Number(totalContractors)
-//     });
-    
-//     await newSite.save();
-
-//     const populatedSite = await Site.findById(newSite._id)
-//       .populate("client")
-//       .lean();
-    
-//     res.status(201).json({
-//       success: true,
-//       message: "Site added successfully",
-//       data: populatedSite
-//     });
-
-//   } catch (error) {
-//     console.error("Error adding site:", error);
-//     if (error.name === 'ValidationError') {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Validation error",
-//         error: error.message
-//       });
-//     }
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//       error: error.message
-//     });
-//   }
-// };
-
-
 import Site from "../models/SiteDetails.js";
 import Client from "../models/ClientDetails.js";
 import multer from "multer";
@@ -130,24 +23,11 @@ const storage = multer.diskStorage({
 
 export const upload = multer({ storage }).single("siteMap");
 
-// Helper function to format dates as DD/MM/YYYY
-function formatDate(date) {
-  if (!date) return null;
-  const parsedDate = new Date(date);
-  if (!isNaN(parsedDate.getTime())) {
-    const day = parsedDate.getDate().toString().padStart(2, '0');
-    const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
-    const year = parsedDate.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-  return date;
-}
-
-// ✅ Add Site (Updated to handle client name lookup)
+// ✅ Add Site
 export const addSite = async (req, res) => {
   try {
     const {
-      client: clientNameOrId, // Can be either name or ID
+      client,
       siteName,
       location,
       totalAreaSqFt,
@@ -168,37 +48,21 @@ export const addSite = async (req, res) => {
       });
     }
 
-    let clientId = null;
-    
-    // If client reference is provided
-    if (clientNameOrId) {
-      // Try to find client by name if not a number
-      if (isNaN(clientNameOrId)) {
-        const client = await Client.findOne({ name: clientNameOrId });
-        if (!client) {
-          return res.status(404).json({
-            success: false,
-            message: "Client not found with the provided name"
-          });
-        }
-        clientId = client._id;
-      } else {
-        // If it's a number, treat as ID
-        const client = await Client.findById(clientNameOrId);
-        if (!client) {
-          return res.status(404).json({
-            success: false,
-            message: "Client not found with the provided ID"
-          });
-        }
-        clientId = client._id;
+    // Validate client exists if provided
+    if (client) {
+      const clientExists = await Client.findById(client);
+      if (!clientExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Client not found"
+        });
       }
     }
 
     const siteMap = req.file ? `/uploads/${req.file.filename}` : undefined;
 
     const newSite = new Site({
-      client: clientId || undefined,
+      client: client || undefined,
       siteName,
       location,
       totalAreaSqFt: Number(totalAreaSqFt),
@@ -240,6 +104,146 @@ export const addSite = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+// import Site from "../models/SiteDetails.js";
+// import Client from "../models/ClientDetails.js";
+// import multer from "multer";
+// import path from "path";
+// import fs from "fs";
+
+// // Ensure uploads directory exists
+// const uploadDir = path.join(process.cwd(), "public", "uploads");
+// if (!fs.existsSync(uploadDir)) {
+//   fs.mkdirSync(uploadDir, { recursive: true });
+// }
+
+// // Multer config for siteMap image upload
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, uploadDir);
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, Date.now() + path.extname(file.originalname));
+//   }
+// });
+
+// export const upload = multer({ storage }).single("siteMap");
+
+// // Helper function to format dates as DD/MM/YYYY
+// function formatDate(date) {
+//   if (!date) return null;
+//   const parsedDate = new Date(date);
+//   if (!isNaN(parsedDate.getTime())) {
+//     const day = parsedDate.getDate().toString().padStart(2, '0');
+//     const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
+//     const year = parsedDate.getFullYear();
+//     return `${day}/${month}/${year}`;
+//   }
+//   return date;
+// }
+
+// // ✅ Add Site (Updated to handle client name lookup)
+// export const addSite = async (req, res) => {
+//   try {
+//     const {
+//       client: clientNameOrId, // Can be either name or ID
+//       siteName,
+//       location,
+//       totalAreaSqFt,
+//       oneAreaSqFtAmount,
+//       startDate,
+//       endDate,
+//       status = 'Planned',
+//       notes,
+//       totalSupervisors = 0,
+//       totalContractors = 0
+//     } = req.body;
+
+//     // Validate required fields
+//     if (!siteName || !location || !totalAreaSqFt || !oneAreaSqFtAmount) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Site name, location, total area, and area amount are required fields"
+//       });
+//     }
+
+//     let clientId = null;
+    
+//     // If client reference is provided
+//     if (clientNameOrId) {
+//       // Try to find client by name if not a number
+//       if (isNaN(clientNameOrId)) {
+//         const client = await Client.findOne({ name: clientNameOrId });
+//         if (!client) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Client not found with the provided name"
+//           });
+//         }
+//         clientId = client._id;
+//       } else {
+//         // If it's a number, treat as ID
+//         const client = await Client.findById(clientNameOrId);
+//         if (!client) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Client not found with the provided ID"
+//           });
+//         }
+//         clientId = client._id;
+//       }
+//     }
+
+//     const siteMap = req.file ? `/uploads/${req.file.filename}` : undefined;
+
+//     const newSite = new Site({
+//       client: clientId || undefined,
+//       siteName,
+//       location,
+//       totalAreaSqFt: Number(totalAreaSqFt),
+//       oneAreaSqFtAmount: Number(oneAreaSqFtAmount),
+//       startDate: startDate || formatDate(new Date()),
+//       endDate: endDate || undefined,
+//       status,
+//       notes,
+//       siteMap,
+//       totalSupervisors: Number(totalSupervisors),
+//       totalContractors: Number(totalContractors)
+//     });
+    
+//     await newSite.save();
+
+//     const populatedSite = await Site.findById(newSite._id)
+//       .populate("client")
+//       .lean();
+    
+//     res.status(201).json({
+//       success: true,
+//       message: "Site added successfully",
+//       data: populatedSite
+//     });
+
+//   } catch (error) {
+//     console.error("Error adding site:", error);
+//     if (error.name === 'ValidationError') {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Validation error",
+//         error: error.message
+//       });
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: error.message
+//     });
+//   }
+// };
 
 // ... (rest of the controller methods remain the same)
 
