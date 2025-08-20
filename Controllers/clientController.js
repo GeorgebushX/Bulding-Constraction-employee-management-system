@@ -32,34 +32,6 @@ const formatDate = (date) => {
   return `${day}/${month}/${year}`;
 };
 
-// Helper function to validate future or current date
-
-// const validateStartDate = (dateStr) => {
-//   if (!dateStr) return false; // Handle empty input
-  
-//   // Check if the string matches DD/MM/YYYY format
-//   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-//     return false;
-//   }
-
-//   const today = new Date();
-//   today.setHours(0, 0, 0, 0); // Set to start of day (00:00:00)
-
-//   // Split DD/MM/YYYY into day, month, year
-//   const [day, month, year] = dateStr.split('/');
-
-//   // Create a new Date in ISO format (YYYY-MM-DD) to avoid parsing issues
-//   const inputDate = new Date(`${year}-${month}-${day}`);
-
-//   // Check if the parsed date is valid (e.g., no "Invalid Date")
-//   if (isNaN(inputDate.getTime())) {
-//     return false;
-//   }
-
-//   // Compare dates (inputDate should be >= today)
-//   return inputDate >= today;
-// };
-
 const validateStartDate = (dateStr) => {
   if (!dateStr) return false; // Handle empty input
 
@@ -89,16 +61,6 @@ const validateStartDate = (dateStr) => {
   // Compare dates (inputDate should be >= today)
   return inputDate >= today;
 };
-
-// const validateStartDate = (dateStr) => {
-//   const today = new Date();
-//   today.setHours(0, 0, 0, 0);
-  
-//   const [day, month, year] = dateStr.split('/');
-//   const inputDate = new Date(`${day}/${month}/${year}`);
-  
-//   return inputDate >= today;
-// };
 
 /**
  * @desc    Create a new client
@@ -248,6 +210,81 @@ export const getClientById = async (req, res) => {
  * @route   PUT /api/clients/:id
  * @access  Public
  */
+// export const updateClient = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updateData = req.body;
+
+//     // Find client
+//     const client = await Client.findById(id);
+//     if (!client) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Client not found"
+//       });
+//     }
+
+//     // Validate startdate if provided
+//     if (updateData.startdate) {
+//       const formattedDate = formatDate(updateData.startdate);
+//       if (!validateStartDate(formattedDate)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Start date must be today or a future date"
+//         });
+//       }
+//       updateData.startdate = formattedDate;
+//     }
+
+//     // Update fields
+//     const updatableFields = [
+//       'name', 'email', 'gender', 'phone', 'alternatePhone',
+//       'address', 'permanentAddress', 'nationality', 'organizationName',
+//       'contactPerson', 'contactPersonPhone', 'contactPersonAddress', 'startdate'
+//     ];
+    
+//     updatableFields.forEach(field => {
+//       if (updateData[field] !== undefined) {
+//         client[field] = updateData[field];
+//       }
+//     });
+
+//     // Update photo if new file uploaded
+//     if (req.file) {
+//       // Delete old photo if exists
+//       if (client.photo) {
+//         const oldPhotoPath = path.join(process.cwd(), 'public', client.photo);
+//         if (fs.existsSync(oldPhotoPath)) {
+//           fs.unlinkSync(oldPhotoPath);
+//         }
+//       }
+//       client.photo = `/uploads/${req.file.filename}`;
+//     }
+
+//     await client.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Client updated successfully",
+//       data: client
+//     });
+
+//   } catch (error) {
+//     if (error.name === 'CastError') {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid client ID format"
+//       });
+//     }
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to update client",
+//       error: error.message
+//     });
+//   }
+// };
+
+
 export const updateClient = async (req, res) => {
   try {
     const { id } = req.params;
@@ -262,16 +299,37 @@ export const updateClient = async (req, res) => {
       });
     }
 
-    // Validate startdate if provided
+    // Format startdate if provided (DD/MM/YYYY format)
     if (updateData.startdate) {
-      const formattedDate = formatDate(updateData.startdate);
-      if (!validateStartDate(formattedDate)) {
+      // Parse DD/MM/YYYY format
+      const dateParts = updateData.startdate.split('/');
+      if (dateParts.length !== 3) {
         return res.status(400).json({
           success: false,
-          message: "Start date must be today or a future date"
+          message: "Start date must be in DD/MM/YYYY format"
         });
       }
-      updateData.startdate = formattedDate;
+      
+      const day = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1; // Months are 0-indexed in JS
+      const year = parseInt(dateParts[2], 10);
+      
+      const inputDate = new Date(year, month, day);
+      
+      // Validate the date
+      if (isNaN(inputDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format. Use DD/MM/YYYY"
+        });
+      }
+      
+      // Format as DD/MM/YYYY for storage (accepts any date including past dates)
+      const formattedDay = String(inputDate.getDate()).padStart(2, '0');
+      const formattedMonth = String(inputDate.getMonth() + 1).padStart(2, '0');
+      const formattedYear = inputDate.getFullYear();
+      
+      updateData.startdate = `${formattedDay}/${formattedMonth}/${formattedYear}`;
     }
 
     // Update fields
@@ -321,6 +379,7 @@ export const updateClient = async (req, res) => {
     });
   }
 };
+
 
 /**
  * @desc    Delete a client
