@@ -16,6 +16,7 @@ dotenv.config();
 
 // import routes
 import authRouter from './Routers/auth.js';
+import engineerDashboard from "./Routers/engineerDashboardRouter.js"
 import clientRouter from "./Routers/clientRouter.js"
 import siteRouter from "./Routers/siteRouter.js"
 import supervisorRouter from "./Routers/SupervisorRouter.js"
@@ -41,6 +42,7 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 
 // Routes
 app.use('/api', authRouter);
+app.use("/api",engineerDashboard)
 app.use("/api", clientRouter)
 app.use("/api",siteRouter)
 app.use("/api",supervisorRouter)
