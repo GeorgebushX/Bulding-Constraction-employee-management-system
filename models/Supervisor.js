@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import User from './User.js';
 import cron from 'node-cron';
 
-// Address schema
+// Address schema 
 const addressSchema = new mongoose.Schema({
   street: String,
   city: String,

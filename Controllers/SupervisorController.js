@@ -2424,3 +2424,298 @@ export const getDateRangeReport = async (req, res) => {
   }
 };
 
+
+
+// @desc    Update attendance status for all supervisors on a specific date
+// @route   PUT /api/supervisors/attendance/bulk-update
+// @access  Private
+export const putAttendanceByDate = async (req, res) => {
+  try {
+    const { date, status } = req.body;
+
+    // Validate required fields
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date is required in the format: DD/MM/YYYY"
+      });
+    }
+
+    if (status === undefined || !["Fullday", "Halfday", "Overtime", null].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid status is required: Fullday, Halfday, Overtime, or null"
+      });
+    }
+
+    // Validate date format
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date format. Please use DD/MM/YYYY"
+      });
+    }
+
+    // Get all supervisors
+    const supervisors = await Supervisor.find();
+
+    if (!supervisors || supervisors.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No supervisors found"
+      });
+    }
+
+    // Update attendance for each supervisor
+    const updatePromises = supervisors.map(async (supervisor) => {
+      // Check if current date matches the target date
+      if (supervisor.currentAttendance && supervisor.currentAttendance.date === date) {
+        // Update current attendance if date matches
+        supervisor.currentAttendance.status = status;
+      } else {
+        // Set new current attendance
+        supervisor.currentAttendance = {
+          date: date,
+          status: status
+        };
+      }
+
+      // Check if record for this date already exists in historical records
+      const existingRecordIndex = supervisor.attendanceRecords.findIndex(
+        record => record.date === date
+      );
+      
+      if (existingRecordIndex >= 0) {
+        // Update existing historical record
+        supervisor.attendanceRecords[existingRecordIndex].status = status;
+        supervisor.attendanceRecords[existingRecordIndex].recordedAt = new Date();
+      } else {
+        // Add new historical record
+        supervisor.attendanceRecords.push({
+          date: date,
+          status: status,
+          recordedAt: new Date()
+        });
+      }
+
+      return supervisor.save();
+    });
+
+    // Wait for all updates to complete
+    await Promise.all(updatePromises);
+
+    // Get updated data for response
+    const updatedSupervisors = await Supervisor.aggregate([
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          name: 1,
+          photo: 1,
+          supervisorType: 1,
+          currentAttendance: 1,
+          // Get status for the specific date from attendanceRecords
+          statusForDate: {
+            $let: {
+              vars: {
+                filteredRecords: {
+                  $filter: {
+                    input: "$attendanceRecords",
+                    as: "record",
+                    cond: { $eq: ["$$record.date", date] }
+                  }
+                }
+              },
+              in: {
+                $cond: {
+                  if: { $gt: [{ $size: "$$filteredRecords" }, 0] },
+                  then: { $arrayElemAt: ["$$filteredRecords.status", 0] },
+                  else: null
+                }
+              }
+            }
+          }
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    // Count statuses for summary
+    const statusCounts = {
+      Fullday: 0,
+      Halfday: 0,
+      Overtime: 0,
+      Absent: 0
+    };
+
+    updatedSupervisors.forEach(supervisor => {
+      const supervisorStatus = supervisor.statusForDate;
+      if (supervisorStatus === 'Fullday') statusCounts.Fullday++;
+      else if (supervisorStatus === 'Halfday') statusCounts.Halfday++;
+      else if (supervisorStatus === 'Overtime') statusCounts.Overtime++;
+      else statusCounts.Absent++; // null or undefined
+    });
+
+    // Prepare response data
+    const responseData = {
+      success: true,
+      message: `Attendance updated successfully for ${date}`,
+      data: {
+        updatedCount: updatedSupervisors.length,
+        date: date,
+        status: status,
+        supervisors: updatedSupervisors.map(sup => ({
+          _id: sup._id,
+          userId: sup.userId,
+          name: sup.name,
+          photo:sup.photo,
+          supervisorType: sup.supervisorType,
+          status: sup.statusForDate
+        })),
+        summary: {
+          total: updatedSupervisors.length,
+          ...statusCounts,
+          present: statusCounts.Fullday + statusCounts.Halfday + statusCounts.Overtime
+        }
+      }
+    };
+
+    return res.status(200).json(responseData);
+
+  } catch (error) {
+    console.error("Error updating attendance:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
+  }
+};
+
+
+
+
+// // @desc    Get attendance data for a specific date using PUT method
+// // @route   PUT /api/supervisors/attendance/date
+// // @access  Private
+// export const putAttendanceByDate = async (req, res) => {
+//   try {
+//     const { date, status } = req.body;
+
+//     // Validate required field
+//     if (!date) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Date is required in the format: { date: 'DD/MM/YYYY' }"
+//       });
+//     }
+
+//     // Validate date format
+//     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid date format. Please use DD/MM/YYYY"
+//       });
+//     }
+
+//     // Get ALL supervisors and check their attendance for the specified date
+//     const supervisors = await Supervisor.aggregate([
+//       {
+//         $project: {
+//           _id: 1,
+//           userId: 1,
+//           name: 1,
+//           photo: 1,
+//           supervisorType: 1,
+//           // Check current attendance
+//           currentStatus: {
+//             $cond: {
+//               if: { $eq: ['$currentAttendance.date', date] },
+//               then: '$currentAttendance.status',
+//               else: null
+//             }
+//           },
+//           // Check historical attendance records
+//           historicalStatus: {
+//             $let: {
+//               vars: {
+//                 filteredRecords: {
+//                   $filter: {
+//                     input: '$attendanceRecords',
+//                     as: 'record',
+//                     cond: { $eq: ['$$record.date', date] }
+//                   }
+//                 }
+//               },
+//               in: {
+//                 $cond: {
+//                   if: { $gt: [{ $size: '$$filteredRecords' }, 0] },
+//                   then: { $arrayElemAt: ['$$filteredRecords.status', 0] },
+//                   else: null
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 1,
+//           userId: 1,
+//           name: 1,
+//           photo: 1,
+//           supervisorType: 1,
+//           status: {
+//             $cond: {
+//               if: { $ne: ['$currentStatus', null] },
+//               then: '$currentStatus',
+//               else: '$historicalStatus'
+//             }
+//           }
+//         }
+//       },
+//       { $sort: { name: 1 } }
+//     ]);
+
+//     // Count statuses for summary
+//     const statusCounts = {
+//       Fullday: 0,
+//       Halfday: 0,
+//       Overtime: 0,
+//       Absent: 0,
+//       NotMarked: 0
+//     };
+
+//     supervisors.forEach(supervisor => {
+//       const status = supervisor.status;
+//       if (status === 'Fullday') statusCounts.Fullday++;
+//       else if (status === 'Halfday') statusCounts.Halfday++;
+//       else if (status === 'Overtime') statusCounts.Overtime++;
+//       else if (status === null || status === undefined) statusCounts.NotMarked++;
+//       else statusCounts.Absent++;
+//     });
+
+//     // Prepare response data
+//     const responseData = {
+//       success: true,
+//       data: supervisors,
+//       summary: {
+//         total: supervisors.length,
+//         ...statusCounts,
+//         present: statusCounts.Fullday + statusCounts.Halfday + statusCounts.Overtime
+//       },
+//       date,
+//       reportType: 'daily'
+//     };
+
+//     return res.status(200).json(responseData);
+
+//   } catch (error) {
+//     console.error("Error fetching attendance by date:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
