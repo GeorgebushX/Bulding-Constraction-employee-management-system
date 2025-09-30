@@ -461,3 +461,158 @@ export const deleteAllClients = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * @desc    Delete a client with site connection validation
+ * @route   DELETE /api/clients/:id
+ * @access  Public
+ */
+export const deleteClient_site = async (req, res) => {
+  try {
+    const clientId = req.params.id;
+
+    // Check if client exists
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: "Client not found"
+      });
+    }
+
+    // Check if client is connected to any sites
+    const connectedSites = await Site.find({ client: clientId });
+    
+    if (connectedSites.length > 0) {
+      const siteNames = connectedSites.map(site => site.siteName);
+      
+      return res.status(400).json({
+        success: false,
+        message: "Client is connected with sites. First delete the sites then delete the client.",
+        data: {
+          connectedSitesCount: connectedSites.length,
+          siteNames: siteNames,
+          sites: connectedSites.map(site => ({
+            id: site._id,
+            siteName: site.siteName,
+            location: site.location
+          }))
+        }
+      });
+    }
+
+    // If no sites connected, proceed with deletion
+    await Client.findByIdAndDelete(clientId);
+
+    // Delete associated photo file if exists
+    if (client.photo) {
+      const photoPath = path.join(process.cwd(), 'public', client.photo);
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Client deleted successfully",
+      data: {
+        deletedClient: {
+          id: client._id,
+          name: client.name,
+          phone: client.phone
+        }
+      }
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid client ID format"
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete client",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Delete all clients with site connection validation
+ * @route   DELETE /api/clients
+ * @access  Public
+ */
+export const deleteAllClients_site = async (req, res) => {
+  try {
+    // Get all clients first to check site connections
+    const clients = await Client.find();
+    
+    // Check for clients connected to sites
+    const clientsWithSites = [];
+    
+    for (const client of clients) {
+      const connectedSites = await Site.find({ client: client._id });
+      if (connectedSites.length > 0) {
+        clientsWithSites.push({
+          client: {
+            id: client._id,
+            name: client.name,
+            phone: client.phone
+          },
+          connectedSites: connectedSites.map(site => ({
+            id: site._id,
+            siteName: site.siteName
+          })),
+          sitesCount: connectedSites.length
+        });
+      }
+    }
+
+    // If any clients are connected to sites, return error
+    if (clientsWithSites.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Some clients are connected to sites. Please delete the sites first.",
+        data: {
+          clientsWithSites: clientsWithSites,
+          totalClientsWithSites: clientsWithSites.length,
+          totalClients: clients.length
+        }
+      });
+    }
+
+    // If no clients are connected to sites, proceed with deletion
+    // Delete all photo files
+    clients.forEach(client => {
+      if (client.photo) {
+        const photoPath = path.join(process.cwd(), 'public', client.photo);
+        if (fs.existsSync(photoPath)) {
+          fs.unlinkSync(photoPath);
+        }
+      }
+    });
+
+    // Delete all clients from database
+    const result = await Client.deleteMany({});
+
+    res.status(200).json({
+      success: true,
+      message: `Deleted ${result.deletedCount} clients and their associated files`,
+      data: {
+        deletedCount: result.deletedCount,
+        deletedClients: clients.map(client => ({
+          id: client._id,
+          name: client.name
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete all clients",
+      error: error.message
+    });
+  }
+};

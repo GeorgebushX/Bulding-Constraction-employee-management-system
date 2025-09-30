@@ -47,7 +47,7 @@ router.get('/supervisors/Attendance/reports/range',authMiddleware, getDateRangeR
 router.get('/supervisors/Attendance/reports/monthly',authMiddleware, getMonthlyAttendanceReport);
 
 router.post("/supervisors", upload,authMiddleware, createSupervisor);
-router.get("/supervisors",authMiddleware, getAllSupervisors);
+router.get("/supervisors/getall",authMiddleware, getAllSupervisors);
 router.get("/supervisors/:id",authMiddleware, getSupervisorById);
 router.put("/supervisors/:id", upload,authMiddleware, updateSupervisorById);
 router.delete("/supervisors/:id",authMiddleware, deleteSupervisorById);
