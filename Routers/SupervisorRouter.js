@@ -31,7 +31,7 @@ router.put("/supervisors/Attendance/:supervisorId", authMiddleware, updateSuperv
 router.put('/supervisors/bulk-by-date',authMiddleware, bulkUpdateAttendanceByDate);
 router.get('/supervisors/:day/:month/:year',authMiddleware, getAttendanceByDate);
 router.put('/supervisors/bulk-by-status',authMiddleware, bulkUpdateAttendanceStatus);
-router.put('/supervisors/today/Attendance',authMiddleware, putAttendanceByDate);
+router.put('/supervisors/today/Attendance',authMiddleware, putAttendanceByDate);  
 // Report routes
 router.get('/supervisors/Attendance/reports/daily/:DD/:MM/:YYYY', getDailyReport);
 router.get('/supervisors/Attendance/reports/weekly/:MM/:YYYY/:week', getWeeklyReport);
