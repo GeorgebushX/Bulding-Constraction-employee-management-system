@@ -32,7 +32,7 @@ const connectDatabase = async () => {
 // Admin user creation
 const createAdminUser = async () => {
   // Setup upload directory
-  const uploadDir = path.join(__dirname, "public", "uploads");
+  const uploadDir = path.join(__dirname, "files", "uploads");
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
