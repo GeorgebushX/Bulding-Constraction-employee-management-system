@@ -5,7 +5,7 @@ import path from "path";
 import fs from "fs";
 
 // Configure upload directory
-const uploadDir = path.join(process.cwd(), "files", "uploads");
+const uploadDir = path.join(process.cwd(), "public/uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

@@ -4,6 +4,7 @@ import cors from "cors";
 import connectDatabase from "./DataBase/mongoDB.js";
 import dotenv from "dotenv";
 import path from "path";
+import bodyParser from "body-parser";
 import { fileURLToPath } from 'url'; // Fix for __dirname issue
 
 dotenv.config();
@@ -38,8 +39,8 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ Serve uploaded files correctly
-app.use("/uploads", express.static(path.join(__dirname, "files", "uploads")));
-
+app.use("./public", express.static(path.join(__dirname, "public", "uploads")));
+app.use(bodyParser.json())
 // Routes
 app.use('/api', authRouter);
 app.use("/api",engineerDashboard)
