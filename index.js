@@ -39,7 +39,7 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ Serve uploaded files correctly
-app.use("./public", express.static(path.join(__dirname, "public", "uploads")));
+app.use("/public", express.static(path.join(__dirname, "public", "uploads")));
 app.use(bodyParser.json())
 // Routes
 app.use('/api', authRouter);
